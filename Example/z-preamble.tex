@@ -1,0 +1,212 @@
+\usepackage[utf8]{inputenc}
+\usepackage{fancybox}
+
+\usepackage{tcolorbox}
+\newtcbox{\mybox}{nobeforeafter,colframe=red,colback=white,boxrule=0.5pt,arc=16pt,
+    boxsep=0pt,left=6pt,right=6pt,top=6pt,bottom=6pt,tcbox raise base}
+
+\usepackage[
+  left=20mm,
+  right=20mm,
+  top=20mm,
+  bottom=20mm,
+  a0paper, % A0: 840mm x 1188mm -- A1: 594mm x 840mm -- A2: 420mm x 594mm 
+           %                    -- A3: 297mm x 420mm -- A4: 210mm x 297mm
+  landscape,margin=1cm]{geometry}
+
+%\newcommand{\generate}[2]{\genCode{#1}{#2}}
+\newcommand{\generate}[2]{\genText{#1}{#2}}
+\newcommand{\genCode}[2]{#1}
+\newcommand{\genText}[2]{#2}
+\newcommand{\ignore}[1]{}
+\newcommand{\termApp}[2]{\ensuremath{\stackrel{\scriptstyle #2}{\mybox{$#1$}}}}
+%\newcommand{\term}[2]{\ensuremath{\stackrel{\scriptstyle #2}{\Ovalbox{$#1$}}}}
+\newcommand{\term}[2]{\ensuremath{\Ovalbox{$#1$}}}
+\newcommand{\ctn}[1]{\textbf{\textrm{#1}}}
+
+\generate{ % Typed version, generation of Haskell code
+\newcommand{\chvar}[2]{\texttt{T.chvar }{\Hstring{#1}}\ \paren{#2}}
+\newcommand{\chlam}[4]{\texttt{T.chlam }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chlamLN}[4]{\texttt{T.chlam }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chmuRec}[4]{\texttt{T.chmu }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chmuRecLN}[4]{\texttt{T.chmu }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chapp}[3]{\texttt{T.chapp }\paren{#1}\ \paren{#2}\ \paren{#3}}
+\newcommand{\chappLN}[3]{\texttt{T.chapp }\paren{#1}\ \paren{#2}\ \paren{#3}}
+\newcommand{\chpair}[2]{\texttt{T.chePar }\paren{#1}\ \paren{#2}}
+\newcommand{\chpairLN}[2]{\texttt{T.chePar }\paren{#1}\ \paren{#2}}
+\newcommand{\chprj}[3]{\texttt{T.chprj }\paren{#1}\ \paren{#2}\ \paren{#3}}
+%
+\newcommand{\chdetPrj}[3]{PROBLEMS}
+%
+\newcommand{\chnum}[1]{\texttt{T.chnum }\paren{#1}}
+\newcommand{\chzero}{\texttt{T.chzero }}
+\newcommand{\chsucc}[1]{\texttt{T.chsucc }\paren{#1}}
+\newcommand{\chpred}[1]{\texttt{T.chpred }\paren{#1}}
+\newcommand{\chIfZ}[4]{\texttt{T.chifZ }\paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chIfZLN}[4]{\texttt{T.chIfZ }\paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\chIfEq}[5]{\texttt{T.chifEq }\paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}\ \paren{#5}}
+\newcommand{\chIfEqLN}[5]{\texttt{T.chIfEq }\paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}\ \paren{#5}}
+\newcommand{\chNewCanon}[3]{\texttt{T.chcanon }\paren{#1}\ \paren{#2}\ \paren{#3}}
+\newcommand{\chNewUncanon}[3]{\texttt{T.chuncanon }\paren{#1}\ \paren{#2}\ \paren{#3}}
+%
+\newcommand{\Star}[1]{\texttt{T.starE }\paren{#1}}
+%
+\newcommand{\AliasA}[2]{\textrm{#1}^{#2}}
+\newcommand{\AliasB}[3]{\textrm{#1}^{#2}\ ({#3})}
+\newcommand{\AliasC}[4]{(\textrm{#1}{#2}\textrm{#3}^{#4})}
+
+\newcommand{\Tmulti}[1]{\texttt{[}#1texttt{]}}
+\newcommand{\TCanon}[2]{\texttt{IT.TCanon }{#1}\ \paren{#2}}
+\newcommand{\Tbiotas}[1]{\texttt{IT.biotas }{#1}}
+\newcommand{\Tiotas}[1]{\texttt{IT.iotas }{#1}}
+\newcommand{\Tfun}[2]{\texttt{IT.tfun }\toList{#1}\ \paren{#2}}
+\newcommand{\Tpar}[1]{\texttt{IT.tpar }\toList{#1}}
+\newcommand{\Ttau}{\texttt{IT.tau}}
+\newcommand{\TIota}{\texttt{IT.iota}}
+\newcommand{\TNat}{\texttt{IT.tNat}}
+}{ % Typed version, generation of LaTeX output
+\newcommand{\binder}[2]{\ensuremath{{#1}^{\scriptstyle #2}}}
+
+\newcommand{\chvar}[2]{\ensuremath{\term{#1}{\Tmulti{#2}}}}
+\newcommand{\chlam}[4]{\ensuremath{\term{\lambda{\binder{#1}{\Tmulti{#2}}}.{#3}}{#4}}}
+\newcommand{\chlamLN}[4]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                                  \ensuremath{\lambda{\binder{#1}{\Tmulti{#2}}}.} \\
+                                                  \ \ \ \ensuremath{#3}
+                                           \end{tabular}}{#4}}}
+\newcommand{\chmuRec}[4]{\ensuremath{\term{\mu{\binder{#1}{\Tmulti{#2}}}.{#3}}{#4}}}
+\newcommand{\chmuRecLN}[4]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                                    \ensuremath{\mu{\binder{#1}{\Tmulti{#2}}}.} \\
+                                                    \ \ \ \ensuremath{#3}
+                                             \end{tabular}}{#4}}}
+\newcommand{\chapp}[3]{\ensuremath{\termApp{#1\ #2}{#3}}}
+%\newcommand{\chapp}[3]{\ensuremath{\term{#1\ #2}{#3}}}
+\newcommand{\chappLN}[3]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                                  \ensuremath{\paren{#1}} \\
+                                                  \ \$\ \ensuremath{\paren{#2}}
+                                           \end{tabular}}{#3}}}
+\newcommand{\chpair}[2]{\ensuremath{\term{#1}{#2}}}
+\newcommand{\chpairLN}[2]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                                  \ensuremath{\paren{#1}}
+                                           \end{tabular}}{#2}}}
+\newcommand{\chprj}[3]{\ensuremath{\term{\pi_{\scriptstyle #1}{(#2)}}{#3}}}
+%
+\newcommand{\chdetPrj}[3]{\ensuremath{\term{\Pi_{\scriptstyle #1}{(#2)}}{#3}}}
+%
+\newcommand{\chnum}[1]{\ensuremath{\underline{#1}}}
+\newcommand{\chzero}{\ensuremath{\chnum{0}}}
+\newcommand{\chsucc}[1]{\ensuremath{\ctn{succ}\paren{#1}}}
+\newcommand{\chpred}[1]{\ensuremath{\ctn{pred}\paren{#1}}}
+\newcommand{\chIfZ}[4]{\ensuremath{\term{\ctn{IfZ}\ \paren{#1}\ \paren{#2}\ \paren{#3}}{#4}}}
+\newcommand{\chIfZLN}[4]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                             \ensuremath{\ctn{IfZ}\ \paren{#1}}  \\
+                                             \ \ \ then=\ensuremath{\paren{#2}}    \\
+                                             \ \ \ else=\ensuremath{\paren{#3}}
+                                           \end{tabular}
+                                          }{#4}}}
+\newcommand{\chIfEq}[5]{\ensuremath{\term{\ctn{IfEq}\ \paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}}{#5}}}
+\newcommand{\chIfEqLN}[5]{\ensuremath{\term{\begin{tabular}[t]{l}
+                                             \ensuremath{\ctn{IfEq}\ \paren{#1}\ \paren{#2}}  \\
+                                             \ \ \ then=\ensuremath{\paren{#3}}    \\
+                                             \ \ \ else=\ensuremath{\paren{#4}}
+                                           \end{tabular}
+                                          }{#5}}}
+\newcommand{\chNewCanon}[3]{\enusremath{\term{\newCanon{#1}{#2}}{#3}}}
+\newcommand{\chNewUncanon}[3]{\enusremath{\term{\newUncanon{#1}{#2}}{#3}}}
+%
+\newcommand{\Star}[1]{\ensuremath{\star}^{#1}}
+%
+\newcommand{\AliasA}[2]{\ensuremath{\textrm{#1}^{#2}}}
+\newcommand{\AliasB}[3]{\ensuremath{(\textrm{#1}^{#2}\ ({#3}))}}
+\newcommand{\AliasC}[4]{\ensuremath{(\textrm{#1}{#2}\textrm{#3}^{#4})}}
+
+\newcommand{\Tmulti}[1]{\ensuremath{#1}}
+\newcommand{\TCanon}[2]{\ensuremath{[\!\![{#2}]\!\!]^\bar{#1}}}
+\newcommand{\Tbiotas}[1]{\ensuremath{\bar{#1}}}
+\newcommand{\Tiotas}[1]{\ensuremath{#1}}
+\newcommand{\Tfun}[2]{\ensuremath{{#1}\rightarrow{#2}}}
+\newcommand{\Tpar}[1]{\ensuremath{\Tmulti{#1}}}
+\newcommand{\Ttau}{\tau}
+\newcommand{\TIota}{\iota}
+\newcommand{\TNat}{\ctn{Nat}}
+}
+
+% Macros to generate functional code
+\newcommand{\Hstring}[1]{\texttt{"}\texttt{#1}\texttt{"}}
+\newcommand{\paren}[1]{\texttt{(}\texttt{#1}\texttt{)}}
+\newcommand{\toList}[1]{\texttt{[}\texttt{#1}\texttt{]}}
+%
+\generate{ % Untyped version, generation of Haskell code
+\newcommand{\var}[2]{\texttt{T.var }{\Hstring{#1}}\ \paren{#2}}
+\newcommand{\lam}[3]{\texttt{T.lam }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}}
+\newcommand{\lamLN}[3]{\texttt{T.lam }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}}
+\newcommand{\muRec}[3]{\texttt{T.mu }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}}
+\newcommand{\muRecLN}[3]{\texttt{T.mu }{\Hstring{#1}}\ \paren{#2}\ \paren{#3}}
+\newcommand{\app}[2]{\texttt{T.app }\paren{#1}\ \paren{#2}}
+\newcommand{\appLN}[2]{\texttt{T.app }\paren{#1}\ \paren{#2}}
+\newcommand{\pair}[1]{\texttt{T.ePar }\paren{#1}}
+\newcommand{\pairLN}[1]{\texttt{T.ePar }\paren{#1}}
+\newcommand{\prj}[2]{\texttt{T.prj }\paren{#1}\ \paren{#2}}
+\newcommand{\Zero}{\texttt{T.zero }}
+\newcommand{\Succ}[1]{\texttt{T.succ }\paren{#1}}
+\newcommand{\Pred}[1]{\texttt{T.pred }\paren{#1}}
+\newcommand{\ifZ}[3]{\texttt{T.ifZ }\paren{#1}\ \paren{#2}\ \paren{#3}}
+\newcommand{\ifEq}[4]{\texttt{T.ifZ }\paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}}
+\newcommand{\newCanon}[2]{\texttt{T.canon }\paren{#1}\ \paren{#2}}
+\newcommand{\newUncanon}[2]{\texttt{T.uncanon }\paren{#1}\ \paren{#2}}
+
+\newcommand{\tfun}[2]{\texttt{IT.tfun }\toList{#1}\ \paren{#2}}
+\newcommand{\tpar}[1]{\texttt{IT.tpar }\toList{#1}}
+\newcommand{\tcanon}[2]{\texttt{IT.TCanon }{#1}\ \paren{#2}}
+\newcommand{\tbiotas}[1]{\texttt{IT.biotas }{#1}}
+\newcommand{\tiotas}[1]{\texttt{IT.iotas }{#1}}
+\newcommand{\ttau}{\texttt{IT.tau}}
+\newcommand{\tIota}{\texttt{IT.iota}}
+\newcommand{\tNat}{\texttt{IT.tNat}}
+}{ % Untyped version, generation of LaTeX output
+\newcommand{\var}[2]{\ensuremath{{#1}^{\scriptstyle #2}}}
+\newcommand{\lam}[3]{\ensuremath{\lambda{\var{#1}{#2}}.{#3}}}
+\newcommand{\lamLN}[3]{\begin{tabular}[t]{@{}l@{}}
+                        \ensuremath{\lambda{\var{#1}{#2}}.}
+                        \\\ \ \ \ \ensuremath{{#3}}
+                       \end{tabular}}
+\newcommand{\muRec}[3]{\ensuremath{\mu{\var{#1}{#2}}.{#3}}}
+\newcommand{\muRecLN}[3]{\begin{tabular}[t]{@{}l@{}}
+                        \ensuremath{\mu{\var{#1}{#2}}.}
+                        \\\ \ \ \ \ensuremath{{#3}}
+                       \end{tabular}}
+\newcommand{\app}[2]{\ensuremath{(#1)\ (#2)}}
+\newcommand{\appLN}[2]{\begin{tabular}[t]{@{}l@{}}
+                         \ensuremath{(#1}\\
+                         \ensuremath{)\ (#2)}
+                       \end{tabular}}
+\newcommand{\pair}[1]{\ensuremath{(#1)}}
+\newcommand{\pairLN}[1]{\begin{tabular}[t]{@{}l@{}}
+                         \ensuremath{(#1)}\\
+                       \end{tabular}}
+\newcommand{\prj}[2]{\ensuremath{\pi_{\scriptstyle #1}{(#2)}}}
+\newcommand{\Zero}{\ensuremath{0}}
+\newcommand{\Succ}[1]{\ensuremath{\ctn{succ}\ \paren{#1}}}
+\newcommand{\Pred}[1]{\ensuremath{\ctn{pred}}\ \paren{#1}}
+\newcommand{\ifZ}[3]{\ensuremath{\ctn{ifZ}\ \paren{#1}\ \paren{#2}\ \paren{#3}}}
+\newcommand{\ifEq}[4]{\ensuremath{\ctn{ifZ}\ \paren{#1}\ \paren{#2}\ \paren{#3}\ \paren{#4}}}
+\newcommand{\newCanon}[2]{\ensuremath{[\!\![{#2}]\!\!]^\bar{#1}}}
+\newcommand{\newUncanon}[2]{\ensuremath{{#2}\Star{#1}}}
+
+\newcommand{\tfun}[2]{\ensuremath{\Tmulti{#1}\rightarrow{#2}}}
+\newcommand{\tpar}[1]{\ensuremath{\Tmulti{#1}}}
+\newcommand{\tcanon}[2]{\ensuremath{[\!\![{#2}]\!\!]^\bar{#1}}}
+\newcommand{\tbiotas}[1]{\ensuremath{\bar{#1}}}
+\newcommand{\tiotas}[1]{\ensuremath{#1}}
+\newcommand{\ttau}{\tau}
+\newcommand{\tIota}{\iota}
+\newcommand{\tNat}{\ctn{Nat}}
+}
+%
+\newcommand{\BaseQ}{\ensuremath{I\!\!B}}
+\newcommand{\TSup}[1]{\ensuremath{S(#1)}}
+\newcommand{\ket}[1]{\ensuremath{|#1\rangle}}
+\newcommand{\ketZero}[1]{\ket{0}}
+\newcommand{\ketOne}[1]{\ket{1}}
+\newcommand{\reduction}[1]{\ensuremath{\rightarrow_{#1}}}
+
+
