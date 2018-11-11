@@ -27,7 +27,15 @@
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
-module QTMonad where
+module QTMonad
+{-
+              (QTMonad, initialState, runQTM
+              ,QTState, QConsole    , getResValue, getResLog, getConsole, getReductionTrace
+                      , printf      , update     
+                      , setTerm     , logTerm    , logReduction
+                      , newVar      
+-}                      
+ where
 
 import Error
 import MapList as Map
@@ -35,9 +43,11 @@ import QTerms as T
 import QTrace
 
 type Variable = String
-type QTState = (Map Variable Int, Int, QReductionTrace)
+            -- (X -> NextVarForX, NextFreeVar, Log)
+type QTState = (Map Variable Int, Int        , QReductionTrace)
 type QConsole = String
 
+-- Monad with state, error and output
 newtype QTMonad a = QTM (QTState -> Error (a, QTState, QConsole))
 
 unQTM (QTM f) = f
@@ -56,15 +66,18 @@ getResLog   (_,(_,_,ts),_) = ts
 getConsole  (_,_,c) = c
 
 
-
 instance Functor QTMonad where
   fmap f (QTM fs) = QTM (\mem -> let xmo = fs mem in fmap (\(x,m,o) -> (f x,m,o)) xmo)
 
+  
+-- Only for GHC 
+{-
 instance Applicative QTMonad where
   pure x = QTM (\mem -> return (x,mem,""))
   (QTM ff) <*> (QTM fx) = QTM (\mem0 -> do (f,mem1,out1) <- ff mem0
                                            (x,mem2,out2) <- fx mem1
                                            return (f x,mem2,out1++out2))
+-}                                           
 
 instance Monad QTMonad where
   return x = QTM (\mem -> return (x,mem,""))
@@ -80,6 +93,19 @@ instance Exception QTMonad where
 printf :: String -> QTMonad ()
 printf msg = QTM (\mem -> return ((),mem,msg))
 
+setTerm :: ChurchQTerm -> QTMonad ()
+setTerm t = QTM (\mem -> return ((), setTermMem t mem, ""))
+
+logTerm :: ChurchQTerm -> QTMonad ()
+logTerm t = QTM (\mem -> return ((), logTermMem t mem, ""))
+
+logReduction :: String -> QTMonad ()
+logReduction rule = QTM(\mem -> return ((), logRedMem rule mem, ""))
+              
+-- Operations related with the generation of fresh variables
+newVar x = QTM (\mem -> let (fvar, newmem) = genVarMem mem x
+                         in return (fvar,newmem,""))
+                          
 -- Operations related with the state 
 update :: (QTState -> QTState) -> QTMonad ()
 update f = QTM (\mem -> return ((),f mem,""))
@@ -102,19 +128,6 @@ incVar :: Variable -> QTMonad ()
 incVar v = do n <- getVar v
               setVar v (n+1)
 
-setTerm :: ChurchQTerm -> QTMonad ()
-setTerm t = QTM(\mem -> return ((), setTermMem t mem, ""))
-
-logTerm :: ChurchQTerm -> QTMonad ()
-logTerm t = QTM(\mem -> return ((), logTermMem t mem, ""))
-
-logReduction :: String -> QTMonad ()
-logReduction rule = QTM(\mem -> return ((), logRedMem rule mem, ""))
-              
--- Operations related with the generation of fresh variables
-newVar x = QTM (\mem -> let (fvar, newmem) = genVarMem mem x
-                         in return (fvar,newmem,""))
-                          
 -- ============================================
 -- Operations related with the map part of the state                            
 lookupMem :: QTState -> Variable -> Maybe Int
