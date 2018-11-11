@@ -30,7 +30,8 @@
 module Multiset(Multiset, empty, isEmpty, singleton, isSingleton, fromSingleton
                         , union, intersect, occurs, flatten
                         , equals, included, substract
-                        , order, foreach, fromList, fromMultiList, fullshow)
+                        , order, foreach, mAll, foldMS
+                        , fromList, fromMultiList, fullshow)
  where
 
  -- They are represented as ordered lists (by element)
@@ -61,29 +62,33 @@ included      :: Ord a => Multiset a -> Multiset a -> Bool
 substract     :: Ord a => Multiset a -> Multiset a -> Maybe (Multiset a)
 order         :: Ord a => Multiset a -> [(a,Int)]
 foreach       :: (Ord a, Ord b) => (a->b) -> Multiset a -> Multiset b
+mAll          :: (Ord a) => (a->Bool) -> Multiset a -> Bool
+foldMS        :: (Ord a) => ((a,Int)->b->b) -> b -> Multiset a -> b
 fromList      :: Ord a => [a] -> Multiset a
 fromMultiList :: Ord a => [(a,Int)] -> Multiset a
 
 ---------------------------------------------------------
 -- Implementation
 ---------------------------------------------------------
-empty                     = MS []
-isEmpty (MS r)            = null r
-singleton  x              = MS (singletonRep x)
-multisingleton x n        = MS (multisingletonRep x n)
-isSingleton (MS xs)       = isSingletonRep xs
-fromSingleton (MS xs)     = fromSingletonRep xs
-union     (MS r1) (MS r2) = MS (unionRep r1 r2)
-intersect (MS r1) (MS r2) = MS (intersectRep r1 r2)
-occurs     x      (MS r)  = occursRep x r
-flatten   (MS mr)         = MS (flattenRep mr)
-equals    (MS r1) (MS r2) = equalsRep r1 r2
-included  (MS r1) (MS r2) = includedRep r1 r2
-substract (MS r1) (MS r2) = fmap MS (substractRep r1 r2)
-order     (MS r)          = orderRep r
-foreach f (MS xs)         = MS (foreachRep f xs)
-fromList  xs              = foldr (\x m -> union (singleton x) m) (MS []) xs
-fromMultiList xns         = foldr (\(x,n) m -> union (multisingleton x n) m) (MS []) xns
+empty                      = MS []
+isEmpty (MS r)             = null r
+singleton  x               = MS (singletonRep x)
+multisingleton x n         = MS (multisingletonRep x n)
+isSingleton (MS xs)        = isSingletonRep xs
+fromSingleton (MS xs)      = fromSingletonRep xs
+union      (MS r1) (MS r2) = MS (unionRep r1 r2)
+intersect  (MS r1) (MS r2) = MS (intersectRep r1 r2)
+occurs      x      (MS r)  = occursRep x r
+flatten    (MS mr)         = MS (flattenRep mr)
+equals     (MS r1) (MS r2) = equalsRep r1 r2
+included   (MS r1) (MS r2) = includedRep r1 r2
+substract  (MS r1) (MS r2) = fmap MS (substractRep r1 r2)
+order      (MS r)          = orderRep r
+foreach f  (MS xs)         = MS (foreachRep f xs)
+mAll    f  (MS xs)         = mAllRep f xs
+foldMS f z (MS xs)         = foldr f z xs
+fromList  xs               = foldr (\x m -> union (singleton x) m) (MS []) xs
+fromMultiList xns          = foldr (\(x,n) m -> union (multisingleton x n) m) (MS []) xns
 
 ---------------------------------------------------------
 -- Functions over representation
@@ -157,8 +162,10 @@ orderRep = id
 
 foreachRep f xs = normalizeRep (map (\(a,i) -> (f a,i)) xs)
 
+mAllRep f xs = all (\(a,i) -> f a) xs
+
 normalizeRep :: Ord a => [(a,Int)] -> [(a,Int)]
--- It orders the output and elminate dupliates. Output satisfies Multisets representation invariant.
+-- It orders the output and elminate duplicates. Output satisfies Multisets representation invariant.
 normalizeRep = foldr (\an -> unionRep [an]) []
 
 ---------------------------------------------------------

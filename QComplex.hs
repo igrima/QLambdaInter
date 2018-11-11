@@ -32,8 +32,10 @@ module QComplex where
 
 import Data.Ratio
 
+--                   a     + b sq2  + c i    + d sq2 i
 --                 Q part  |sq2 part|img part|sq2i part
 data QComplex = QC Rational Rational Rational Rational
+     deriving (Ord)
 
 img :: QComplex
 img = QC 0 0 1 0
@@ -69,7 +71,8 @@ showPart r p | denominator r == 1 = show (numerator r) ++ p
 showPart r ""                     = show r
 showPart r p                      = "(" ++ show r ++ ")" ++ p
 
-showRationalPart r = showPart r ""
+showRationalPart 1 = showPart 1 "1"  -- when part is Rational, 1 should show as 1; otherwise, showPart uses only part
+showRationalPart r = showPart r ""   -- when part is Rational, numbers should show as themselves (and NOT x 1)
 showSq2Part      r = showPart r " sq2"
 showIPart        r = showPart r " i"
 showSq2IPart     r = showPart r " sq2 i"

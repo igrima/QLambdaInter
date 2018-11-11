@@ -29,36 +29,42 @@
 -- -----------------------------------------------------------------------------------------------------------//
 module Main where
 
+import QComplex
 import QTerms
 import QTypes
-import QTsTypeInference
-import QTsReduction
-import QTrace
+--import QTsTypeInference
+--import QTsReduction
+--import QTrace
 
 ejZero = k0
 ejOne  = k1
 
-ejId = lam "x" baseQ (var "x")
-ejIdB = lam "b"baseQ(var "b")
+ejId  = lam "x" bQ (var "x")
+ejIdB = lam "b" bQ (var "b")
 
 ejIdInZero = app ejIdB ejZero
 ejIdInOne  = app ejIdB ejOne
 
-ejHOId = lam "x" (baseQ |-> baseQ) (var "x")
+ejHOId = lam "x" (bQ |=> bQ) (var "x")
 
-ejApply = lam "f" (baseQ |-> baseQ) (lam "x" baseQ (app (var "f") (var "x")))
+ejApply = lam "f" (bQ |=> bQ) (lam "x" bQ (app (var "f") (var "x")))
 
-ejApIdId = lam "t" baseQ (app (app ejApply ejId) (var "t"))
+ejApIdId = lam "t" bQ (app (app ejApply ejId) (var "t"))
 
-ejForReduce1 = app (app (lam "x"baseQ(lam "y"baseQ(var "x"))) k0) k1
+ejForReduce1 = app (app (lam "x" bQ (lam "y" bQ (var "x"))) k0) k1
 
-ejForReduce2 = app (app (lam "x"baseQ(lam "y" (baseQ |-> baseQ) (var "x"))) ejForReduce1) ejId
+ejForReduce2 = app (app (lam "x" bQ (lam "y" (bQ |=> bQ) (var "x"))) ejForReduce1) ejId
 
+ejCNot = lam "x" bQ (var "x" <*> var "x")
 
-ejReduceOne = reduceOne (decorate ejIdInOne)
+ejKPlus = (1 / sq2) .> (ejZero <+> ejOne)
+
+ejMeCNotKPlus = proj 1 (upR (app ejCNot ejKPlus))
+
+--ejReduceOne = reduceOne (decorate ejIdInOne)
 
 --ejReduceMore = 
 
-main = do
-    writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
-    return ()
+--main = do
+--    writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
+--    return ()

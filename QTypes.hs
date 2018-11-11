@@ -28,43 +28,76 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
 
-module QTypes where
+module QTypes(QType(..), bQ, bQn, (|=>), sup, (|*|), prod) where
 
 
-data QType = B
+data QType = TB
            | TSup QType
-           | Fun QType QType
-        deriving (Eq, Ord)
+           | TFun QType QType
+           | TProd [ QType ]
+        deriving (Eq, Ord, Show)
+  {- REP.INV.:
+       In (Prod qts), elements of qts do not have Fun on any level.
+       In (Fun qt1 qt2), qt1 do not have Fun on any level.
+       -- Use functions for construction instead of constructors
+       
+     OBS.: 
+       QBitType   ::= B | S(QBitType) | Prod [ QBitType ]
+       ValidQType ::= QBitType | QBitType => ValidQType | S(ValidQType)
+  -}
+        
+isQBitType :: QType -> Bool
+isQBitType TB         = True
+isQBitType (TFun _ _) = False
+isQBitType (TSup t)   = isQBitType t
+isQBitType (TProd ts) = all isQBitType ts
 
-(|->) :: QType -> QType -> QType
-(|->) t u = if (isQBitType t)
-             then Fun t u
-             else error ("Argument is not a QBitType for |->: " ++ show t)
+isValidQType :: QType -> Bool
+isValidQType (TSup t)     = isValidQType t
+isValidQType (TFun t1 t2) = isQBitType t1 && isValidQType t2
+isValidQType t            = isQBitType t
+
+
+---------------------------------------------------------
+-- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
+---------------------------------------------------------
+bQ :: QType
+bQ = TB
+
+bQn :: Int -> QType
+bQn n = TProd (replicate n bQ)
+
+(|=>) :: QType -> QType -> QType
+(|=>) t u = if (isQBitType t)
+             then if (isValidQType u)
+                   then TFun t u
+                   else error ("Result is not a valid QType for |=>: " ++ show u)
+             else error ("Argument is not a QBitType for |=>: " ++ show t)
 
 sup :: QType -> QType
-sup t = TSup t
+sup t = if (isValidQType t)
+         then TSup t
+         else error ("Argument is not a valid QType for Sup: " ++ show t)
 
-baseQ :: QType
-baseQ = B
+(|*|) :: QType -> QType -> QType         
+(TProd ts) |*| (TProd ts') = TProd (ts++ts')
+(TProd ts) |*| t'          = TProd (ts++[t'])
+t          |*| (TProd ts') = TProd (t:ts')
+t          |*| t'          = TProd [t,t']         
 
-isQBitType :: QType -> Bool
-isQBitType B         = True
-isQBitType (TSup t)   = isQBitType t
-isQBitType (Fun _ _) = False
-
-isProperType :: QType -> Bool
-isProperType B         = True
-isProperType (TSup _)   = True
-isProperType (Fun t _) = isQBitType t
-
+prod :: [ QType ] -> QType
+prod ts = if (all isQBitType ts) 
+           then TProd ts 
+           else error ("Some argument is not a QBitType: " ++ show ts)
+         
 ---------------------------------------------------------
 -- Show
---   (uses LaTeX macros from z-prelude)
+--   (uses LaTeX macros from z-preamble)
 ---------------------------------------------------------
-instance Show QType where
-  show t = myShowQT t
+--instance Show QType where
+--  show t = myShowQT t
   
-myShowQT B                    = "\\BaseQ"
-myShowQT (TSup t)              = "\\TSup{" ++ show t ++ "}"
-myShowQT (Fun mt@(Fun _ _) t) = "\\Tfun{(" ++ show mt ++ ")}{" ++ show t ++ "}"
-myShowQT (Fun mt t)           = "\\Tfun{" ++ show mt ++ "}{" ++ show t ++ "}"
+myShowQT TB         = "\\BaseQ"
+myShowQT (TSup t)   = "\\TSup{" ++ show t ++ "}"
+myShowQT _          = error "TO COMPLETE"
+

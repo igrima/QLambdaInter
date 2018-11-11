@@ -31,54 +31,125 @@
 module QTerms where
 
 import QTypes as QT
-import Data.List
+import QComplex
+import Multiset as MS
+import Data.List as L
 --import Error
 --import NewVarMonad
 
 type Vble = String
 data QBit = KZero | KOne
-          deriving (Eq, Ord)
-data BaseQT a = Var Vble a
+          deriving (Eq, Ord, Show)
+type LinBQT a = MS.Multiset (QComplex, BaseQT a)
+data BaseQT a = 
+                -- Constants
+                QBit QBit
+              | Null a      -- O_S(a)
+                -- Base Lambda Calculus
+              | Var Vble a
               | Lam Vble QT.QType (BaseQT a) a
               | App (BaseQT a) (BaseQT a) a
-              | Base QBit
-              | Sup --TODO:NACHO: ACA HAY QUE HACERLO
-        deriving (Eq, Ord)
+                -- Linear combinations
+              | LC (LinBQT a) a
+                -- Superpositions
+              | Prod [ BaseQT a ] a
+              | Head (BaseQT a) a
+              | Tail (BaseQT a) a
+                -- Projections
+              | Proj Int (BaseQT a) a
+                -- Alternatives
+              | QIf (BaseQT a) (BaseQT a) a
+                -- Castings (True==Right, False==Left)
+              | Up Bool (BaseQT a) a
+        deriving (Eq, Ord, Show)
+   {-
+      Type parameter a is a technique for processing church style typing.
+      The type (BaseQT ()) is the type of not-yet-typed terms, and the
+      type (BaseQT QT.QType) is the type of typed terms.
+      Church terms are annotated with their types (subterms and variables
+      are also annotated).
+      A valid Church term is only annotated with a type valid according
+      the system typing rules.
+   -}
 
 type QTerm       = BaseQT ()
 type ChurchQTerm = BaseQT QT.QType
 
+asLinCom :: BaseQT a -> LinBQT a
+asLinCom (LC mt _) = mt
+asLinCom t         = singleton (1, t)
+
+-- Get the type annotated in a Church term.
 getType :: ChurchQTerm -> QT.QType
+getType (QBit _)      = QT.bQ
+getType (Null t)      = QT.sup t
 getType (Var _ t)     = t
 getType (Lam _ _ _ t) = t
 getType (App _ _ t)   = t
-getType (Base _)      = baseQ
+getType (LC _ t)      = t
+getType (Prod _ t)    = t
+getType (Head _ t)    = t
+getType (Tail _ t)    = t
+getType (Proj _ _ t)  = t
+getType (QIf _ _ t)   = t
+getType (Up _ _ t)    = t
 
 -- PRECOND: the term is ground and well typed 
-isValue (App _ _ _) = False
-isValue _           = True
+isBase :: BaseQT a -> Bool
+isBase (QBit _)      = True
+isBase (Var _ _)     = True
+isBase (Lam _ _ _ _) = True
+isBase (Prod ts _)   = all isBase ts
+isBase _             = False
 
+isLam :: BaseQT a -> Bool
 isLam (Lam _ _ _ _) = True
 isLam _             = False
 
+isGround :: Ord a => BaseQT a -> Bool
 isGround t = freeVars t == []
 
-freeVars (Var x _) = [x]
+freeVars :: Ord a => BaseQT a -> [Vble]
+freeVars (Var x _)     = [x]
 freeVars (Lam x _ t _) = freeVars t \\ [x]
-freeVars (App t u _) = freeVars t `union` freeVars u
-freeVars (Base _)  = []
+freeVars (App t u _)   = freeVars t `L.union` freeVars u
+freeVars (LC mt _)     = foldMS (\((_,t),_) fvs -> freeVars t `L.union` fvs) [] mt
+freeVars (Prod ts _)   = foldr L.union [] (map freeVars ts)
+freeVars (Head t _)    = freeVars t
+freeVars (Tail t _)    = freeVars t
+freeVars (Proj _ t _)  = freeVars t
+freeVars (QIf t u _)   = freeVars t `L.union` freeVars u
+freeVars (Up _ t _)    = freeVars t
+freeVars _             = []
 
 ---------------------------------------------------------
 -- Functions for easy construction
 ---------------------------------------------------------
 -- Untyped version
+k0, k1 :: QTerm
+k0        = QBit KZero
+k1        = QBit KOne
+
+nullV t   = Null (sup t)
+
 var x     = Var x ()
 lam x t e = Lam x t e ()
 app r s   = App r s ()
-k0, k1 :: QTerm
-k0        = Base KZero
-k1        = Base KOne
 
+a .> t    = LC (singleton (a,t)) ()
+t <+> u   = LC (MS.union (asLinCom t) (asLinCom u)) ()
+
+t <*> u   = Prod (asList t ++ asList u) ()
+  where asList (Prod ts _) = ts 
+        asList t           = [t]
+
+qHead t   = Head t ()
+qTail t   = Tail t ()
+proj j t  = Proj j t ()
+qIf t u   = QIf t u ()
+upR t     = Up True t ()
+upL t     = Up False t ()
+        
 ---------------------------------------------------------
 -- Show
 --  Showing uses LaTeX macros from z-prelude
@@ -90,7 +161,7 @@ showQT :: BaseQT a -> String
 showQT (Var x _)      = "\\var{" ++ x ++ "}{}"
 showQT (Lam x tx r _) = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
 showQT (App r s _)    = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
-showQT (Base k)       = showBase k
+showQT (QBit k)       = showBase k
 
 
 showChQT :: ChurchQTerm -> String  
@@ -98,13 +169,13 @@ showChQT (Var x tx)        = "\\chvar{"  ++ x ++ "}{" ++ show tx ++ "}"
 showChQT (Lam x tx r tlam) = "\\chlam{"  ++ x ++ "}{" ++ show tx ++ "}{" 
                                          ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
 showChQT (App r s tapp)    = "\\chapp{"  ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
-showChQT (Base k)          = showBase k
+showChQT (QBit k)          = showBase k
     
-instance Show a => Show (BaseQT a) where
-  show (Var x tx)        = showVar x tx
-  show (Lam x tx r tlam) = showLam x tx r tlam
-  show (App r s tapp)    = showApp r s tapp
-  show (Base k)          = showBase k
+--instance Show a => Show (BaseQT a) where
+--  show (Var x tx)        = showVar x tx
+--  show (Lam x tx r tlam) = showLam x tx r tlam
+--  show (App r s tapp)    = showApp r s tapp
+--  show (QBit k)          = showBase k
 
 
 showVar x tx = "\\chvar{" ++ x ++ "}{" ++ show tx ++ "}"
