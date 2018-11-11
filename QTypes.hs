@@ -35,7 +35,7 @@ data QType = TB
            | TSup QType
            | TFun QType QType
            | TProd [ QType ]
-        deriving (Eq, Ord, Show)
+        deriving (Eq, Ord)
   {- REP.INV.:
        In (Prod qts), elements of qts do not have Fun on any level.
        In (Fun qt1 qt2), qt1 do not have Fun on any level.
@@ -94,10 +94,14 @@ prod ts = if (all isQBitType ts)
 -- Show
 --   (uses LaTeX macros from z-preamble)
 ---------------------------------------------------------
---instance Show QType where
---  show t = myShowQT t
+instance Show QType where
+  show t = myShowQT t
   
 myShowQT TB         = "\\BaseQ"
 myShowQT (TSup t)   = "\\TSup{" ++ show t ++ "}"
-myShowQT _          = error "TO COMPLETE"
+myShowQT (TFun t u) = "\\TFun{" ++ show t ++ "}{" ++ show u ++ "}"
+myShowQT (TProd ts) = myShowListProd ts
+myShowQT _          = error "Extend the function in case you extend the type"
 
+myShowListProd [x]    = show x
+myShowListProd (x:ts) = show x ++ " \\times " ++ myShowListProd ts
