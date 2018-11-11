@@ -28,8 +28,8 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
 
+-- This is a first order calculus: Functions does not accept functions as a parameter
 module QTypes(QType(..), bQ, bQn, (|=>), sup, (|*|), prod) where
-
 
 data QType = TB
            | TSup QType
