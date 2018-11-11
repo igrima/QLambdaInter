@@ -52,6 +52,7 @@ newtype QTMonad a = QTM (QTState -> Error (a, QTState, QConsole))
 
 unQTM (QTM f) = f
 
+initialState :: QTState
 initialState = (Map.emptyM, 0, [])
 
 runQTM :: QTMonad a -> (a, QTState, QConsole)

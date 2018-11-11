@@ -34,54 +34,140 @@ import QTypes as QT
 import QTerms
 import QTMonad
 import Error
---import List(sort)
+import List
 
 ---------------------------------------------------------
 -- Environment
 ---------------------------------------------------------
-newtype Environment = E (Vble -> Maybe QT.QType)
+newtype Environment = E [(Vble, QT.QType)]
 
-emptyEnv = E (\x -> Nothing)
+emptyEnv = E []
 
-buildEnv :: [(Vble, QT.QType)] -> Environment
-buildEnv vts = E (\v -> lookup v vts)
+{-
+buildEnv :: [(Vble, QT.QType)] -> (Error OR QTMonad???????) Environment
+buildEnv xts = do xts' <- buildEnvRep xts
+                  return (E xts')
+-}
+
+buildEnv :: [(Vble, QT.QType)] -> Maybe Environment
+buildEnv xts = fmap E (buildEnvRep xts)
 
 appEnv :: Environment -> Vble -> Maybe QT.QType
-appEnv (E env) x = env x
+appEnv (E xts) x = lookup x xts
 
-updateEnv :: Environment -> Vble -> QT.QType -> Environment
-updateEnv env x tx = E (\y -> if x==y then Just tx else appEnv env y)
+updateEnv :: Environment -> Vble -> QT.QType -> Maybe Environment
+updateEnv (E xts) x tx = fmap E (addToEnvRep (x,tx) xts)
+
+-- To be used in rules that should split nonduplicable variables
+trimEnvWrt :: Ord a => Environment -> BaseQT a -> Maybe Environment
+trimEnvWrt (E xts) t = fmap E (trimEnvRep xts (freeVars t))
+                            -- The result of trimEnvRep is a Maybe, 
+                            -- that should be lifted with fmap
+
+restrictEnv (E xts) x = E (restrictEnvRep xts x)
+
+checkAllDuplicable (E xts) = checkAllDuplicableRep xts
+                            
+-- To be used in rules that should split nonduplicable variables
+--  (the overlap of both trims should be duplicable)
+overlapIsDuplicable :: Environment -> Environment -> Bool
+overlapIsDuplicable (E xts) (E xts') = case (intersectEnvRep xts xts') of 
+                                        Nothing  -> False       -- When can this happen?
+                                        Just xts -> all (isDuplicable . snd) xts
+                                        {-
+                                        (do xts'' <- intersectEnvRep xts xts'
+                                            return (all (isDuplicable . snd) xts'')
+                                        ) `mplus` (return False)
+                                        -}
+
+-- Environment representation manipulation
+--  (addToEnvRep and intersectEnvRep may bew improved to use Error monad...)
+buildEnvRep xts = foldr addToMaybeER (Just []) xts
+
+addToEnvRep xt    xts = addToMaybeER xt (Just xts)
+
+addToMaybeER _     Nothing              = Nothing
+addToMaybeER xt    (Just [])            = Just [xt]
+addToMaybeER (x,t) (Just ((x',t'):xts)) = 
+    if (x==x') 
+     then Nothing
+     else fmap ((x',t') :) (addToEnvRep (x,t) xts)
+
+trimEnvRep xts []     = Just xts
+trimEnvRep xts (x:xs) = 
+  case (lookup x xts) of
+    Nothing -> Nothing
+    Just tx -> if (isDuplicable tx)
+                then trimEnvRep xts xs
+                else trimEnvRep (restrictEnvRep xts x) xs
+
+restrictEnvRep [] _ = []
+restrictEnvRep ((x', t'):xts) x =
+           if x==x' && (not (isDuplicable t'))
+            then restrictEnvRep xts x
+            else (x',t') : restrictEnvRep xts x
+
+checkAllDuplicableRep []          = return ()
+checkAllDuplicableRep ((_,t):xts) = if (isDuplicable t) 
+                                     then checkAllDuplicableRep xts
+                                     else raise "Nonduplicable variables discarded in environment"
+                                       
+            
+{-                
+intersectEnvRep []           _    = return []
+intersectEnvRep ((x,tx):xts) xts' = 
+    case (lookup x xts') of 
+       Nothing  -> intersectEnvRep xts xts'
+       Just tx' -> if (tx==tx') 
+                    then do xts'' <- intersectEnvRep xts xts'
+                            return ((x,tx) : xts'')
+                    else raise "PONER MENSAJE DE ERROR" 
+-}                    
+                
+intersectEnvRep []           _    = Just []
+intersectEnvRep ((x,tx):xts) xts' = 
+    case (lookup x xts') of 
+       Nothing  -> intersectEnvRep xts xts'
+       Just tx' -> if (tx==tx') 
+                    then fmap ((x,tx) :) (intersectEnvRep xts xts')
+                    else Nothing
+
 ---------------------------------------------------------
 -- inferType
 ---------------------------------------------------------
-infer r = let (x, _, _) = runQTM (inferType emptyEnv r) 
-           in x
+infer r = getResValue (runQTM (inferType emptyEnv r))
 
 inferType env r = do (_,tr) <- deduceTypes env r
                      return tr
 
-decorate r = let (x, _, _) = runQTM (decorateTerm emptyEnv r) 
-              in x
+decorate r = getResValue (runQTM (decorateTerm emptyEnv r))
 
 decorateTerm env r = do (chr,_) <- deduceTypes env r
                         return chr
 
 deduceTypes :: Environment -> QTerm -> QTMonad (ChurchQTerm, QType)
+deduceTypes env (Null t)  = 
+   do checkAllDuplicable env
+      return (Null t, t)
+deduceTypes env (QBit b) = 
+   do checkAllDuplicable env 
+      return (QBit b, QT.qB)
 deduceTypes env (Var x _) = 
-   do tx <- findTypeInEnv x env
+   do tx   <- findTypeInEnv x env
+      envB <- restrictEnv env x
+      checkAllDuplicable envB
       return (Var x tx, tx) 
-deduceTypes env (Lam x tx r _) =
+deduceTypes env (Lam x tx t _) =
    do newEnv    <- addTypeToEnv (x,tx) env
-      (chr, tr) <- deduceTypes newEnv r
-      tlam      <- lamType tx tr
-      return (Lam x tx chr tlam, tlam)
-deduceTypes env (App r s _) = 
+      (cht, tt) <- deduceTypes newEnv t
+      tlam      <- lamType tx tt
+      return (Lam x tx cht tlam, tlam)
+deduceTypes env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
    do (r, tr) <- deduceTypes env r
       (s, ts) <- deduceTypes env s
       tapp    <- appType tr ts
       return (App r s tapp, tapp)
-deduceTypes env (Base k) = return (Base k, B)
-
+-- COMPLETAR
 ---------------------------------------------------------
 -- AUXILIARIES to build types inferred
 ---------------------------------------------------------
@@ -107,3 +193,4 @@ addTypeToEnv (x,tx) env =
    Just _  -> raise ("Variable " ++ x ++ " already has a type in context")
    Nothing -> return (updateEnv env x tx)
 
+-}

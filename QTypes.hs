@@ -29,7 +29,10 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), bQ, bQn, (|=>), sup, (|*|), prod) where
+module QTypes(QType(..), bQ, bQn, (|=>), sup, (|*|), prod
+                       , isDuplicable, isQBitType, isValidQType
+             )
+ where
 
 data QType = TB
            | TSup QType
@@ -57,6 +60,10 @@ isValidQType (TSup t)     = isValidQType t
 isValidQType (TFun t1 t2) = isQBitType t1 && isValidQType t2
 isValidQType t            = isQBitType t
 
+isDuplicable :: QType -> Bool
+isDuplicable TB         = True
+isDuplicable (TProd ts) = all isDuplicable ts
+isDuplicable _          = False
 
 ---------------------------------------------------------
 -- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
@@ -100,6 +107,7 @@ instance Show QType where
 myShowQT TB         = "\\BaseQ"
 myShowQT (TSup t)   = "\\TSup{" ++ show t ++ "}"
 myShowQT (TFun t u) = "\\TFun{" ++ show t ++ "}{" ++ show u ++ "}"
+myShowQT (TProd ts) | all isDuplicable ts = "\\BaseQN{" ++ show (length ts) ++ "}"
 myShowQT (TProd ts) = myShowListProd ts
 myShowQT _          = error "Extend the function in case you extend the type"
 

@@ -39,11 +39,13 @@ instance Functor Error where
    fmap _ (Error e)      = Error e
    fmap _ (FatalError e) = FatalError e
 
+{- Only for GHC
 instance Applicative Error where
    pure = Success
    (Success f)    <*> mx   = fmap f mx
    (Error e)      <*> _   = Error e
    (FatalError e) <*> _   = FatalError e
+-}
 
 instance Monad Error where 
    (Success x)    >>= k   = k x
