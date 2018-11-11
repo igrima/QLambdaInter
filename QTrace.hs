@@ -37,7 +37,7 @@ showTrace :: QReductionTrace -> String
 showTrace ((rule, term):ls) = "\\begin{tabular}{l}\n" ++ showChQT term ++ "\n\\\\\n" ++ showT rule ls ++ "\\end{tabular}"
 
 showT :: String -> QReductionTrace -> String
-showT rule ((_, term):[])  = showReduce rule term
+showT rule ((_, term):[])     = showReduce rule term
 showT rule ((rule', term):ls) = showReduce rule term ++ showT rule' ls
 
 
