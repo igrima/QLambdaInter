@@ -81,8 +81,8 @@ asLinCom t         = singleton (1, t)
 
 -- Get the type annotated in a Church term.
 getType :: ChurchQTerm -> QT.QType
-getType (QBit _)      = QT.bQ
-getType (Null t)      = QT.sup t
+getType (QBit _)      = QT.tB
+getType (Null t)      = QT.tSup t
 getType (Var _ t)     = t
 getType (Lam _ _ _ t) = t
 getType (App _ _ t)   = t
@@ -130,7 +130,7 @@ k0, k1 :: QTerm
 k0        = QBit KZero
 k1        = QBit KOne
 
-nullV t   = Null (sup t)
+nullV t   = Null (tSup t)
 
 var x     = Var x ()
 lam x t e = Lam x t e ()
