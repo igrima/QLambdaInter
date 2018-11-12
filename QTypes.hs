@@ -29,7 +29,7 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), bQ, bQn, (|=>), sup, (|*|), prod
+module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
                        , isDuplicable, isQBitType, isValidQType
              )
  where
@@ -68,11 +68,11 @@ isDuplicable _          = False
 ---------------------------------------------------------
 -- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
 ---------------------------------------------------------
-bQ :: QType
-bQ = TB
+tB :: QType
+tB = TB
 
-bQn :: Int -> QType
-bQn n = TProd (replicate n bQ)
+tBn :: Int -> QType
+tBn n = TProd (replicate n tB)
 
 (|=>) :: QType -> QType -> QType
 (|=>) t u = if (isQBitType t)
@@ -81,8 +81,8 @@ bQn n = TProd (replicate n bQ)
                    else error ("Result is not a valid QType for |=>: " ++ show u)
              else error ("Argument is not a QBitType for |=>: " ++ show t)
 
-sup :: QType -> QType
-sup t = if (isValidQType t)
+tSup :: QType -> QType
+tSup t = if (isValidQType t)
          then TSup t
          else error ("Argument is not a valid QType for Sup: " ++ show t)
 
@@ -92,8 +92,8 @@ sup t = if (isValidQType t)
 t          |*| (TProd ts') = TProd (t:ts')
 t          |*| t'          = TProd [t,t']         
 
-prod :: [ QType ] -> QType
-prod ts = if (all isQBitType ts) 
+tProd :: [ QType ] -> QType
+tProd ts = if (all isQBitType ts) 
            then TProd ts 
            else error ("Some argument is not a QBitType: " ++ show ts)
          

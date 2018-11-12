@@ -39,23 +39,23 @@ import QTypes
 ejZero = k0
 ejOne  = k1
 
-ejId  = lam "x" bQ (var "x")
-ejIdB = lam "b" bQ (var "b")
+ejId  = lam "x" tB (var "x")
+ejIdB = lam "b" tB (var "b")
 
 ejIdInZero = app ejIdB ejZero
 ejIdInOne  = app ejIdB ejOne
 
-ejHOId = lam "x" (bQ |=> bQ) (var "x")
+ejHOId = lam "x" (tB |=> tB) (var "x")
 
-ejApply = lam "f" (bQ |=> bQ) (lam "x" bQ (app (var "f") (var "x")))
+ejApply = lam "f" (tB |=> tB) (lam "x" tB (app (var "f") (var "x")))
 
-ejApIdId = lam "t" bQ (app (app ejApply ejId) (var "t"))
+ejApIdId = lam "t" tB (app (app ejApply ejId) (var "t"))
 
-ejForReduce1 = app (app (lam "x" bQ (lam "y" bQ (var "x"))) k0) k1
+ejForReduce1 = app (app (lam "x" tB (lam "y" tB (var "x"))) k0) k1
 
-ejForReduce2 = app (app (lam "x" bQ (lam "y" (bQ |=> bQ) (var "x"))) ejForReduce1) ejId
+ejForReduce2 = app (app (lam "x" tB (lam "y" (tB |=> tB) (var "x"))) ejForReduce1) ejId
 
-ejCNot = lam "x" bQ (var "x" <*> var "x")
+ejCNot = lam "x" tB (var "x" <*> var "x")
 
 ejKPlus = (1 / sq2) .> (ejZero <+> ejOne)
 
