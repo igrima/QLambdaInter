@@ -34,10 +34,11 @@ module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, appEnv
                     )
  where
 
+import Error
 import QTypes as QT
 import QTerms
 import QTMonad as QTM
-import List
+import Data.List
 
 ---------------------------------------------------------
 -- Environment
@@ -51,7 +52,7 @@ appEnv                   :: Environment -> Vble -> Maybe QT.QType
 trimEnvWrt               :: Ord a => Environment -> BaseQT a -> QTMonad Environment
 restrictEnv              :: Environment -> Vble -> QTMonad Environment
 checkAllDuplicable       :: Environment -> QTMonad ()
-checkOverlapIsDuplicable :: Environment -> Environment -> QTMonad Bool
+checkOverlapIsDuplicable :: Environment -> Environment -> QTMonad ()
 
 emptyEnv                   = E []
 
@@ -65,7 +66,7 @@ updateEnv (E xts) x tx     = fmap E (addToEnvRep (x,tx) xts)
 --   (it should remove from the environment all freeVars of t that are NOT duplicable)
 trimEnvWrt (E xts) t       = fmap E (trimEnvRep xts (freeVars t))
 
-restrictEnv (E xts) x      = E (restrictEnvRep xts x)
+restrictEnv (E xts) x      = return (E (restrictEnvRep xts x))
 
 checkAllDuplicable (E xts) = checkAllDuplicableRep xts
                             
