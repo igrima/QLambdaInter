@@ -152,24 +152,38 @@ upL t     = Up False t ()
         
 ---------------------------------------------------------
 -- Show
---  Showing uses LaTeX macros from z-prelude
+--  Showing uses LaTeX macros from z-preamble
 --  There are 2 versions of show:
 --     * one used to pretty display with ovalboxes, etc.
 --     * another used to generate Haskell code to build types
 ---------------------------------------------------------
 showQT :: BaseQT a -> String
-showQT (Var x _)      = "\\var{" ++ x ++ "}{}"
-showQT (Lam x tx r _) = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
-showQT (App r s _)    = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
-showQT (QBit k)       = showBase k
+showQT (QBit k)          = showBase k
+showQT (Null _)          = "\\Null"
+showQT (Var x _)         = "\\var{" ++ x ++ "}{}"
+showQT (Lam x tx r _)    = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
+showQT (App r s _)       = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
+{-showQT (LC (LinBQT _) _) = "\\"
 
+              | LC (LinBQT a) a
+                -- Superpositions
+              | Prod [ BaseQT a ] a
+              | Head (BaseQT a) a
+              | Tail (BaseQT a) a
+                -- Projections
+              | Proj Int (BaseQT a) a
+                -- Alternatives
+              | QIf (BaseQT a) (BaseQT a) a
+                -- Castings (True==Right, False==Left)
+              | Up Bool (BaseQT a) a -}
 
-showChQT :: ChurchQTerm -> String  
+showChQT :: ChurchQTerm -> String
+showChQT (QBit k)          = showBase k
 showChQT (Var x tx)        = "\\chvar{"  ++ x ++ "}{" ++ show tx ++ "}"
 showChQT (Lam x tx r tlam) = "\\chlam{"  ++ x ++ "}{" ++ show tx ++ "}{" 
                                          ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
 showChQT (App r s tapp)    = "\\chapp{"  ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
-showChQT (QBit k)          = showBase k
+showChQT (Null tn)         = "\\Null_" ++ show tn
     
 --instance Show a => Show (BaseQT a) where
 --  show (Var x tx)        = showVar x tx
