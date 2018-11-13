@@ -27,15 +27,7 @@
 -- along with this program; if not, write to the Free Software
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
-module QTMonad
-{-
-              (QTMonad, initialState, runQTM
-              ,QTState, QConsole    , getResValue, getResLog, getConsole, getReductionTrace
-                      , printf      , update     
-                      , setTerm     , logTerm    , logReduction
-                      , newVar      
--}                      
- where
+module QTMonad where
 
 import Error
 import MapList as Map
@@ -87,7 +79,7 @@ instance Monad QTMonad where
                              return (y,mem2,out1++out2))
 
 instance Exception QTMonad where
-  raise msg = QTM (\mem -> raise msg)
+  raise msg = QTM (\_ -> raise msg)
   failingWithMsg (QTM f) msg = QTM (\mem -> failingWithMsg (f mem) msg)
                              
 -- Operations related with the console
