@@ -163,10 +163,10 @@ showQT (Null _)          = "\\Null"
 showQT (Var x _)         = "\\var{" ++ x ++ "}{}"
 showQT (Lam x tx r _)    = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
 showQT (App r s _)       = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
-{-showQT (LC (LinBQT _) _) = "\\"
+showQT (LC mxs _)        = "\\paren{" ++ showLCSum (order mxs) ++ "}"
 
-              | LC (LinBQT a) a
-                -- Superpositions
+
+{-
               | Prod [ BaseQT a ] a
               | Head (BaseQT a) a
               | Tail (BaseQT a) a
@@ -184,6 +184,16 @@ showChQT (Lam x tx r tlam) = "\\chlam{"  ++ x ++ "}{" ++ show tx ++ "}{"
                                          ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
 showChQT (App r s tapp)    = "\\chapp{"  ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
 showChQT (Null tn)         = "\\Null_" ++ show tn
+showChQT (LC mxs tlc)      = "\\LinQT{" ++ showQT (LC mxs tlc) ++ "}{" ++ show tlc ++ "}"
+
+
+-- aux
+showLCSum      []           = ""
+showLCSum      [x]          = showLinBQTItem x
+showLCSum      (x:xs)       = showLinBQTItem x ++ " + " showLCSum xs
+showLinBQTItem ((qc,tx), n) = showQCxQT (qc * fromInteger n, tx)
+showQCxQT      (1, tx)      = show tx
+showQCxQT      (qcomp,tx)   = "\\paren{" ++ showNested qcomp ++ " " ++ show tx ++ "}"
     
 --instance Show a => Show (BaseQT a) where
 --  show (Var x tx)        = showVar x tx
