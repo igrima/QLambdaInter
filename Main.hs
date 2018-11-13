@@ -29,12 +29,30 @@
 -- -----------------------------------------------------------------------------------------------------------//
 module Main where
 
+import Multiset as MS
 import QComplex
 import QTerms
-import QTypes
---import QTsTypeInference
+import QTypes as QT
+import QTMonad
+import QEnvironments
+import QTsTypeInference
 --import QTsReduction
 --import QTrace
+
+runM m = getResValue (runQTM m)
+
+ejLCBody = k0 <+> var "x"
+ejLCWrongBody = var "x" <+> var "x"
+ejLCSB = lam "x" (tSup QT.tB) ejLCBody
+ejLCB = lam "x" (QT.tB) ejLCBody
+ejLCWrong = lam "x" (tSup QT.tB) ejLCWrongBody
+envLC = runM (updateEnv ("x", tSup QT.tB) emptyEnv)
+
+ejLC2Fun = lam "x" (QT.tB) (var "x" <+> var "x")
+ejLC2 = app ejLC2Fun ejKPlus
+
+ejLCB2 = ejIdB <+> ejLCB
+ejLCSB2 = ejSBId <+> ejLCSB
 
 ejZero = k0
 ejOne  = k1
@@ -44,6 +62,8 @@ ejIdB = lam "b" tB (var "b")
 
 ejIdInZero = app ejIdB ejZero
 ejIdInOne  = app ejIdB ejOne
+
+ejSBId = lam "x" (tSup tB) (var "x")
 
 ejHOId = lam "x" (tB |=> tB) (var "x")
 

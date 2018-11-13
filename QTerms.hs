@@ -44,13 +44,13 @@ type LinBQT a = MS.Multiset (QComplex, BaseQT a)
 data BaseQT a = 
                 -- Constants
                 QBit QBit
-              | Null a      -- O_S(a)
+              | Null QT.QType    -- (Null t) is O_S(t)
                 -- Base Lambda Calculus
               | Var Vble a
               | Lam Vble QT.QType (BaseQT a) a
               | App (BaseQT a) (BaseQT a) a
                 -- Linear combinations
-              | LC (LinBQT a) a
+              | LC (LinBQT a) a     -- The multiset is not empty!!!
                 -- Superpositions
               | Prod [ BaseQT a ] a
               | Head (BaseQT a) a
@@ -136,8 +136,9 @@ var x     = Var x ()
 lam x t e = Lam x t e ()
 app r s   = App r s ()
 
-a .> t    = LC (singleton (a,t)) ()
-t <+> u   = LC (MS.union (asLinCom t) (asLinCom u)) ()
+a .> t     = LC (singleton (a,t)) ()
+t <+> u    = LC (MS.union (asLinCom t) (asLinCom u)) ()
+linCom tsi typ = LC (MS.fromMultiList tsi) typ
 
 t <*> u   = Prod (asList t ++ asList u) ()
   where asList (Prod ts _) = ts 

@@ -30,12 +30,13 @@
 
 module QTsTypeInference where
 
+import Multiset as MS
 import QTypes as QT
 import QTerms
 import QTMonad
 import Error
 import List
-import QEnviroments
+import QEnvironments
 
 
 ---------------------------------------------------------
@@ -43,60 +44,93 @@ import QEnviroments
 ---------------------------------------------------------
 infer r = getResValue (runQTM (inferType emptyEnv r))
 
-inferType env r = do (_,tr) <- deduceTypes env r
+inferType env r = do (_,tr) <- deduceType env r
                      return tr
 
 decorate r = getResValue (runQTM (decorateTerm emptyEnv r))
 
-decorateTerm env r = do (chr,_) <- deduceTypes env r
+decorateTerm env r = do (chr,_) <- deduceType env r
                         return chr
 
-deduceTypes :: Environment -> QTerm -> QTMonad (ChurchQTerm, QType)
-deduceTypes env (Null t)  = 
+deduceType :: Environment -> QTerm -> QTMonad (ChurchQTerm, QType)
+deduceType env (Null t)  =        -- rule Ax0
    do checkAllDuplicable env
       return (Null t, t)
-deduceTypes env (QBit b) = 
+deduceType env (QBit b) =         -- rules Ax|0> and Ax|1>
    do checkAllDuplicable env 
-      return (QBit b, QT.qB)
-deduceTypes env (Var x _) = 
+      return (QBit b, QT.tB)
+deduceType env (Var x _) =        -- rule Ax
    do tx   <- findTypeInEnv x env
       envB <- restrictEnv env x
       checkAllDuplicable envB
       return (Var x tx, tx) 
-deduceTypes env (Lam x tx t _) =
-   do newEnv    <- addTypeToEnv (x,tx) env
-      (cht, tt) <- deduceTypes newEnv t
+deduceType env (Lam x tx t _) =
+   do newEnv    <- updateEnv (x,tx) env
+      (cht, tt) <- deduceType newEnv t
       tlam      <- lamType tx tt
       return (Lam x tx cht tlam, tlam)
-deduceTypes env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
-   do (r, tr) <- deduceTypes env r
-      (s, ts) <- deduceTypes env s
-      tapp    <- appType tr ts
-      return (App r s tapp, tapp)
+deduceType env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
+   error "To Do" {- do (r, tr) <- deduceType env r
+                       (s, ts) <- deduceType env s
+                       tapp    <- appType tr ts
+                       return (App r s tapp, tapp)
+                 -}
+deduceType env (LC mt _) =
+    do let tsi = MS.order mt
+       (chtsi, tsup) <- deduceTypesForLC env tsi
+       return (linCom chtsi tsup, tsup)
+
 -- COMPLETAR
+
+deduceTypesForLC env [((q,t),n)]     = 
+    do checkNonDuplication n env (freeVars t)
+       (cht', tt') <- deduceType env t
+       stt' <- produceCompatibleSupTypeFor tt' tt'
+       return ([((q,cht'),n)], stt')
+deduceTypesForLC env (((q,t),n):ts) = 
+    do checkNonDuplication n env (freeVars t)
+       envForTs <- trimEnvWrt env t
+       envForT  <- trimEnvWrt env (linCom ts ())
+       checkOverlapIsDuplicable envForTs envForT
+       (chts', stt') <- deduceTypesForLC envForTs ts
+       (cht', tt')   <- deduceType envForT t 
+       stt''         <- produceCompatibleSupTypeFor tt' stt'
+       return ((((q,cht'),n):chts'), stt'')
+
+       
+-- This function is not right!!!!!!!
+produceCompatibleSupTypeFor t1@(TSup t1') (TSup t2') = 
+    do t' <- produceCompatibleSupTypeFor t1' t2'
+       return (tSup t')
+produceCompatibleSupTypeFor t1@(TSup t1') t2 =
+    if (t1' /= t2)
+     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
+     else return t1
+produceCompatibleSupTypeFor t1 t2@(TSup t2') = 
+    if (t1 /= t2')
+     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
+     else return t2
+produceCompatibleSupTypeFor t1 t2 = 
+    if (t1 /= t2)
+     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
+     else return (tSup t1)
+     
+checkNonDuplication 1 _   _  = return ()
+checkNonDuplication n env xs = do txs <- sequence (map (\x -> findTypeInEnv x env) xs)
+                                  if (all isDuplicable txs)
+                                   then return ()
+                                   else raise "Non linear use of a variable"
+     
 ---------------------------------------------------------
 -- AUXILIARIES to build types inferred
 ---------------------------------------------------------
 -- PRECOND: tr and ts are canonical
-lamType tx tr = return (QT.Fun tx tr)
+lamType tx tr = return (QT.TFun tx tr)
 
 -- PRECOND: tr and ts are canonical
-appType (Fun a b) c = if a == c
-                       then return b
-                       else raise ("Arguments and parameters do not fit: " ++ show a ++ " y el otro " ++ show c)
-appType _         _ = raise "Non-function in function position"
-                      
----------------------------------------------------------
--- AUXILIARIES to inferType
----------------------------------------------------------
-findTypeInEnv x env = 
-  case (appEnv env x) of
-    Nothing -> raise ("Term has free variable " ++ x)
-    Just tx -> return tx
+appType (QT.TFun a b) c = if a == c
+                           then return b
+                           else raise ("Arguments and parameters do not fit: " ++ show a ++ " expected, but " ++ show c ++ " provided")
+appType _             _ = raise "Non-function in function position"
 
-addTypeToEnv (x,tx) env = 
-  case (appEnv env x) of
-   Just _  -> raise ("Variable " ++ x ++ " already has a type in context")
-   Nothing -> return (updateEnv env x tx)
 
--}
