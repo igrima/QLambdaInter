@@ -87,7 +87,7 @@ instance Monad QTMonad where
                              return (y,mem2,out1++out2))
 
 instance Exception QTMonad where
-  raise msg = QTM (\mem -> raise msg)
+  raise msg = QTM (\_ -> raise msg)
   failingWithMsg (QTM f) msg = QTM (\mem -> failingWithMsg (f mem) msg)
                              
 -- Operations related with the console
