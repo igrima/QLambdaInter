@@ -221,7 +221,13 @@
 \newcommand{\ketZero}[1]{\ket{0}}
 \newcommand{\ketOne}[1]{\ket{1}}
 \newcommand{\Null}{\ensuremath{0}}
-\newcommand{\LinQT}[2]{\ensuremath{#1\ #2}}
+\newcommand{\LinQT}[2]{\ensuremath{\termApp{#1}{#2}}}
+\newcommand{\Prod}[2]{\ensuremath{\termApp{#1}{#2}}}
+\newcommand{\Head}[2]{\ensuremath{\termApp{head\ #1}{#2}}}
+\newcommand{\Tail}[2]{\ensuremath{\termApp{tail\ #1}{#2}}}
+\newcommand{\Proj}[3]{\ensuremath{\termApp{\pi_#1\ #2}{#3}}}
+\newcommand{\Ite}[3]{\ensuremath{\termApp{?{#1}\mathord{\cdot}{#2}}{#3}}}
+\newcommand{\Cast}[3]{\ensuremath{\termApp{\Uparrow_{#1}\ #2}{#3}}}
 
 \newcommand{\reduction}[1]{\ensuremath{\rightarrow_{#1}}}
 
