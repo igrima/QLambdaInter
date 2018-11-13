@@ -47,20 +47,13 @@ buildEnv :: [(Vble, QT.QType)] -> QTMonad Environment
 buildEnv xts = do xts' <- buildEnvRep xts
                   return (E xts')
 
-{-
-buildEnv :: [(Vble, QT.QType)] -> Maybe Environment
-buildEnv xts = fmap E (buildEnvRep xts)
--}
-
 appEnv :: Environment -> Vble -> Maybe QT.QType
 appEnv (E xts) x = lookup x xts
 
 updateEnv :: Environment -> Vble -> QT.QType -> QTMonad Environment
-updateEnv (E xts) x tx = addToEnvRep (x,tx) xts
+updateEnv (E xts) x tx = do xts' <- addToEnvRep (x,tx) xts
+                            return (E xts')
                             
-
-{- updateEnv :: Environment -> Vble -> QT.QType -> Maybe Environment
-updateEnv (E xts) x tx = fmap E (addToEnvRep (x,tx) xts) -}
 
 -- To be used in rules that should split nonduplicable variables
 trimEnvWrt :: Ord a => Environment -> BaseQT a -> Maybe Environment
@@ -86,23 +79,19 @@ overlapIsDuplicable (E xts) (E xts') = case (intersectEnvRep xts xts') of
 
 -- Environment representation manipulation
 --  (addToEnvRep and intersectEnvRep may bew improved to use Error monad...)
-buildEnvRep xts = foldr addToMaybeER (Just []) xts
+-- buildEnvRep xts = foldr addToMaybeER (Just []) xts
+buildEnvRep :: [(Vble, QT.QType)] -> QTMonad [(Vble, QT.QType)]
+buildEnvRep []       =  return []
+buildEnvRep (xt:xts) =  do xts' <- buildEnvRep xts
+                           addToEnvRep xt xts'
 
 -- TODO:NACHO:THIS HERE IS ALL WRONG!!!!!!
-addToEnvRep :: (Vble, QT.QType) -> [(Vble, QT.QType)] -> QTMonad Environment
-addToEnvRep xt    xts = do xts' <- addToMaybeER xt (Just xts)
-                         return (case xts' of 
-                                  Nothing -> {-SOMETHING SHALL BE DONE HERE?-}
-                                  Just xts'' -> (E xts''))
+addToEnvRep :: (Vble, QT.QType) -> [(Vble, QT.QType)] -> QTMonad [(Vble, QT.QType)]
+addToEnvRep xt@(x,_) xts = case lookup x xts of
+                            Just _ -> raise ("Variable " ++ x ++ " already in the Environment")
+                            _      -> return (xt:xts)
+                         
 
-{- addToEnvRep xt    xts = addToMaybeER xt (Just xts) -}
-
-addToMaybeER _     Nothing              = Nothing
-addToMaybeER xt    (Just [])            = Just [xt]
-addToMaybeER (x,t) (Just ((x',t'):xts)) = 
-    if (x==x') 
-     then Nothing
-     else fmap ((x',t') :) (addToEnvRep (x,t) xts)
 
 trimEnvRep xts []     = Just xts
 trimEnvRep xts (x:xs) = 
