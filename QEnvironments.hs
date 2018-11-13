@@ -49,6 +49,10 @@ emptyEnv                 :: Environment
 buildEnv                 :: [(Vble, QT.QType)] -> QTMonad Environment
 updateEnv                :: Environment -> Vble -> QT.QType -> QTMonad Environment
 appEnv                   :: Environment -> Vble -> Maybe QT.QType
+
+-- These operations implements the functionality needed by the "linear" feature of
+--  the type system in QTsTypeInference (superpositions can be used exactly one time:
+--  we call them nonDuplicable types)
 trimEnvWrt               :: Ord a => Environment -> BaseQT a -> QTMonad Environment
 restrictEnv              :: Environment -> Vble -> QTMonad Environment
 checkAllDuplicable       :: Environment -> QTMonad ()
