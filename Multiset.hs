@@ -144,7 +144,7 @@ includedRep xs@((x,n):xs') ys@((y,m):ys') =
     else if x < y
     then    False
     else    includedRep xs ys'
-	
+
 -- PRECOND: substractRep xs ys, ys is included in xs
 substractRep ys []  = Just ys
 substractRep [] _   = Nothing
