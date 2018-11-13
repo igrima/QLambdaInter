@@ -167,7 +167,7 @@ showQT (LC mxs _)     = "\\LinQT{" ++ showLCSum (order mxs) ++ "}{}"
 showQT (Prod xs _)    = "\\Prod{" ++ showProd xs ++ "}{}"
 showQT (Head x _)     = "\\Head{" ++ showQT x ++ "}{}"
 showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
-showQT (Proj i x _)   = "\\Proj{" ++ i ++ "}{" ++ showQT x ++ "}{}"
+showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
 showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
 showQT (Up True x _)  = "\\Cast{r}{" ++ showQT x ++ "}{}"
 showQT (Up False x _) = "\\Cast{ell}{" ++ showQT x ++ "}{}"
@@ -180,29 +180,29 @@ showChQT (Lam x tx r tlam) = "\\chlam{" ++ x ++ "}{" ++ show tx ++ "}{"
 showChQT (App r s tapp)    = "\\chapp{" ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
 showChQT (Null tn)         = "\\Null_{"  ++ show tn ++ "}"
 showChQT (LC mxs tlc)      = "\\LinQT{" ++ showChLCSum (order mxs) ++ "}{" ++ show tlc ++ "}"
-showChQT (Prod xs tprod)   = "\\Prod{"  ++ showChProd xs ++ "}{" ++ show tlc ++ "}"
+showChQT (Prod xs tprod)   = "\\Prod{"  ++ showChProd xs ++ "}{" ++ show tprod ++ "}"
 showChQT (Head x thead)    = "\\Head{" ++ showChQT x ++ "}{" ++ show thead ++ "}"
 showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}"
-showChQT (Proj j x tproj)  = "\\Proj{" ++ j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
+showChQT (Proj j x tproj)  = "\\Proj{" ++ show j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
 showChQT (QIf x y tqif)    = "\\Ite{" ++ showChQT x ++ "}{" ++ showChQT y ++ "}{" ++ show tqif ++ "}"
 showChQT (Up True x tup)   = "\\Cast{r}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
 showChQT (Up False x tup)  = "\\Cast{ell}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
 
 -- aux
-showList       showElem separator []     = ""
-showList       showElem separator [x]    = showElem x
-showList       showElem separator (x:xs) = showElem x ++ separator ++ (showList showElem separator xs)
+showFromList showElem separator []     = ""
+showFromList showElem separator [x]    = showElem x
+showFromList showElem separator (x:xs) = showElem x ++ separator ++ (showFromList showElem separator xs)
 
-showLCSum                                = showList showLinBQTItem " + "
-showChLCSum                              = showList showChLinBQTItem " + "
+showLCSum                              = showFromList showLinBQTItem " + "
+showChLCSum                            = showFromList showChLinBQTItem " + "
 
-showProd                                 = showList showQT " \\times "
-showChProd                               = showList showChQT " \\times "
+showProd                               = showFromList showQT " \\times "
+showChProd                             = showFromList showChQT " \\times "
 
-showLinBQTItem ((qc,x), 1)   = showQCxQT (qc, tx)
-showLinBQTItem ((qc,x), n)   = showQCxQT (qc, tx) ++ " + " ++ showLinBQTItem ((qc,x), n-1)
-showChLinBQTItem ((qc,x), 1) = showChQCxQT (qc, tx)
-showChLinBQTItem ((qc,x), n) = showChQCxQT (qc, tx) ++ " + " ++ showChLinBQTItem ((qc,x), n-1)
+showLinBQTItem ((qc,x), 1)   = showQCxQT (qc, x)
+showLinBQTItem ((qc,x), n)   = showQCxQT (qc, x) ++ " + " ++ showLinBQTItem ((qc,x), n-1)
+showChLinBQTItem ((qc,x), 1) = showChQCxQT (qc, x)
+showChLinBQTItem ((qc,x), n) = showChQCxQT (qc, x) ++ " + " ++ showChLinBQTItem ((qc,x), n-1)
 
 showQCxQT      (1, x)      = showQT x
 showQCxQT      (qcomp, x)  = "\\paren{" ++ showNested qcomp ++ " " ++ showQT x ++ "}"
