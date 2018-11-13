@@ -159,32 +159,57 @@ upL t     = Up False t ()
 --     * another used to generate Haskell code to build types
 ---------------------------------------------------------
 showQT :: BaseQT a -> String
-showQT (QBit k)          = showBase k
-showQT (Null _)          = "\\Null"
-showQT (Var x _)         = "\\var{" ++ x ++ "}{}"
-showQT (Lam x tx r _)    = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
-showQT (App r s _)       = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
-{-showQT (LC (LinBQT _) _) = "\\"
-
-              | LC (LinBQT a) a
-                -- Superpositions
-              | Prod [ BaseQT a ] a
-              | Head (BaseQT a) a
-              | Tail (BaseQT a) a
-                -- Projections
-              | Proj Int (BaseQT a) a
-                -- Alternatives
-              | QIf (BaseQT a) (BaseQT a) a
-                -- Castings (True==Right, False==Left)
-              | Up Bool (BaseQT a) a -}
+showQT (QBit k)       = showBase k
+showQT (Null _)       = "\\Null"
+showQT (Var x _)      = "\\var{" ++ x ++ "}{}"
+showQT (Lam x tx r _) = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
+showQT (App r s _)    = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
+showQT (LC mxs _)     = "\\LinQT{" ++ showLCSum (order mxs) ++ "}{}"
+showQT (Prod xs _)    = "\\Prod{" ++ showProd xs ++ "}{}"
+showQT (Head x _)     = "\\Head{" ++ showQT x ++ "}{}"
+showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
+showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
+showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
+showQT (Up True x _)  = "\\Cast{r}{" ++ showQT x ++ "}{}"
+showQT (Up False x _) = "\\Cast{ell}{" ++ showQT x ++ "}{}"
 
 showChQT :: ChurchQTerm -> String
 showChQT (QBit k)          = showBase k
-showChQT (Var x tx)        = "\\chvar{"  ++ x ++ "}{" ++ show tx ++ "}"
-showChQT (Lam x tx r tlam) = "\\chlam{"  ++ x ++ "}{" ++ show tx ++ "}{" 
-                                         ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
-showChQT (App r s tapp)    = "\\chapp{"  ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
-showChQT (Null tn)         = "\\Null_" ++ show tn
+showChQT (Var x tx)        = "\\chvar{" ++ x ++ "}{" ++ show tx ++ "}"
+showChQT (Lam x tx r tlam) = "\\chlam{" ++ x ++ "}{" ++ show tx ++ "}{" 
+                                        ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
+showChQT (App r s tapp)    = "\\chapp{" ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
+showChQT (Null tn)         = "\\Null_{"  ++ show tn ++ "}"
+showChQT (LC mxs tlc)      = "\\LinQT{" ++ showChLCSum (order mxs) ++ "}{" ++ show tlc ++ "}"
+showChQT (Prod xs tprod)   = "\\Prod{"  ++ showChProd xs ++ "}{" ++ show tprod ++ "}"
+showChQT (Head x thead)    = "\\Head{" ++ showChQT x ++ "}{" ++ show thead ++ "}"
+showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}"
+showChQT (Proj j x tproj)  = "\\Proj{" ++ show j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
+showChQT (QIf x y tqif)    = "\\Ite{" ++ showChQT x ++ "}{" ++ showChQT y ++ "}{" ++ show tqif ++ "}"
+showChQT (Up True x tup)   = "\\Cast{r}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
+showChQT (Up False x tup)  = "\\Cast{ell}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
+
+-- aux
+showFromList showElem separator []     = ""
+showFromList showElem separator [x]    = showElem x
+showFromList showElem separator (x:xs) = showElem x ++ separator ++ (showFromList showElem separator xs)
+
+showLCSum                              = showFromList showLinBQTItem " + "
+showChLCSum                            = showFromList showChLinBQTItem " + "
+
+showProd                               = showFromList showQT " \\times "
+showChProd                             = showFromList showChQT " \\times "
+
+showLinBQTItem ((qc,x), 1)   = showQCxQT (qc, x)
+showLinBQTItem ((qc,x), n)   = showQCxQT (qc, x) ++ " + " ++ showLinBQTItem ((qc,x), n-1)
+showChLinBQTItem ((qc,x), 1) = showChQCxQT (qc, x)
+showChLinBQTItem ((qc,x), n) = showChQCxQT (qc, x) ++ " + " ++ showChLinBQTItem ((qc,x), n-1)
+
+showQCxQT      (1, x)      = showQT x
+showQCxQT      (qcomp, x)  = "\\paren{" ++ showNested qcomp ++ " " ++ showQT x ++ "}"
+showChQCxQT    (1, x)      = showChQT x
+showChQCxQT    (qcomp, x)  = "\\paren{" ++ showNested qcomp ++ " " ++ showChQT x ++ "}"
+--
     
 --instance Show a => Show (BaseQT a) where
 --  show (Var x tx)        = showVar x tx

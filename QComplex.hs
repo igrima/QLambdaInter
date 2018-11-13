@@ -50,10 +50,16 @@ instance Eq QComplex where
                                        si1 == si2
 
 instance Show QComplex where
-  show (QC r s i si) = alsoShowWhenZero (showRationalPart r .++. showSq2Part s .++. showIPart i .++. showSq2IPart si)
+  show q = alsoShowWhenZero (showParts q)
 
-alsoShowWhenZero "" = "0"
-alsoShowWhenZero s  = s
+
+showNested       q             = let qstr = showParts q
+                                  in if ('+' `elem` qstr)
+                                     then "\\paren{" ++ qstr ++ "}"
+                                     else qstr
+showParts        (QC r s i si) = showRationalPart r .++. showSq2Part s .++. showIPart i .++. showSq2IPart si
+alsoShowWhenZero ""            = "0"
+alsoShowWhenZero s             = s
 
 (.++.) :: String -> String -> String
 "" .++. "" = ""
