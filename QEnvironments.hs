@@ -28,7 +28,7 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
 
-module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, findTypeInEnv 
+module QEnvironments(Environment(..), emptyEnv, buildEnv, updateEnv, findTypeInEnv 
                                 , trimEnvWrt, restrictEnv
                                 , checkAllDuplicable, checkOverlapIsDuplicable
                     )

@@ -29,19 +29,24 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
+module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd, tPhS
                        , isDuplicable, isQBitType, isValidQType
              )
  where
 
 data QType = TB
            | TSup QType
+           | TSstar QType          -- Trick to have any number of S_i rules. DO NOT USE EXPLICITLY ON TYPES
+           | TSplus QType          -- Trick to have any number of S_i rules. DO NOT USE EXPLICITLY ON TYPES
            | TFun QType QType
            | TProd [ QType ]
         deriving (Eq, Ord)
   {- REP.INV.:
        In (Prod qts), elements of qts do not have Fun on any level.
        In (Fun qt1 qt2), qt1 do not have Fun on any level.
+       In (TSstar qt), qt is not a TSup or TSstar or TSplus
+       In (TSplus qt), qt is not a TSup or TSstar or TSplus
+       In (TSup   qt), qt is not a TSstar
        -- Use functions for construction instead of constructors
        
      OBS.: 
@@ -53,17 +58,25 @@ isQBitType :: QType -> Bool
 isQBitType TB         = True
 isQBitType (TFun _ _) = False
 isQBitType (TSup t)   = isQBitType t
+isQBitType (TSstar t) = isQBitType t
+isQBitType (TSplus t) = isQBitType t
 isQBitType (TProd ts) = all isQBitType ts
 
 isValidQType :: QType -> Bool
 isValidQType (TSup t)     = isValidQType t
+isValidQType (TSstar t)   = isValidQType t
+isValidQType (TSplus t)   = isValidQType t
 isValidQType (TFun t1 t2) = isQBitType t1 && isValidQType t2
 isValidQType t            = isQBitType t
 
 isDuplicable :: QType -> Bool
 isDuplicable TB         = True
 isDuplicable (TProd ts) = all isDuplicable ts
+isDuplicable (TSstar t) = isDuplicable t
 isDuplicable _          = False
+
+isTB TB = True
+isTB _  = False
 
 ---------------------------------------------------------
 -- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
@@ -83,9 +96,11 @@ tBn n = TProd (replicate n tB)
 
 tSup :: QType -> QType
 tSup t = if (isValidQType t)
-         then TSup t
-         else error ("Argument is not a valid QType for Sup: " ++ show t)
-
+          then case t of
+                 TSstar t' -> TSplus t'
+                 _         -> TSup t
+          else error ("Argument is not a valid QType for Sup: " ++ show t)
+          
 (|*|) :: QType -> QType -> QType         
 (TProd ts) |*| (TProd ts') = TProd (ts++ts')
 (TProd ts) |*| t'          = TProd (ts++[t'])
@@ -93,23 +108,57 @@ t          |*| (TProd ts') = TProd (t:ts')
 t          |*| t'          = TProd [t,t']         
 
 tProd :: [ QType ] -> QType
-tProd ts = if (all isQBitType ts) 
-           then TProd ts 
-           else error ("Some argument is not a QBitType: " ++ show ts)
+tProd [t1,t2] = t1 |*| t2
+tProd (t:ts)  = t |*| tProd ts
+tProd []      = error "Wrong number of factors in product"
+-- It was:
+--tProd ts = if (all isQBitType ts) 
+--           then TProd ts 
+--           else error ("Some argument is not a QBitType: " ++ show ts)
+         
+---------------------------------------------------------
+-- Internal Function used in typing rules (DO NOT USE IT FOR TERM CONSTRUCTION)
+---------------------------------------------------------
+tPhS :: QType -> QType
+tPhS (TSup t)   = tSup (tPhS t)
+tPhS (TSstar t) = TSstar t
+tPhS (TSplus t) = TSplus t
+tPhS t          = TSstar t           
+
+tSplus :: QType -> QType
+tSplus (TSup t)   = tSup (tSplus t)
+tSplus (TSstar t) = TSplus t
+tSplus (TSplus t) = tSup (TSplus t)
+tSplus t          = TSplus t           
          
 ---------------------------------------------------------
 -- Show
 --   (uses LaTeX macros from z-preamble)
 ---------------------------------------------------------
 instance Show QType where
-  show t = myShowQT t
+  show t = niceShowQT t
   
 myShowQT TB         = "\\BaseQ"
 myShowQT (TSup t)   = "\\TSup{" ++ show t ++ "}"
+myShowQT (TSplus t) = "\\TSup{" ++ show t ++ "}"
+myShowQT (TSstar t) = show t
 myShowQT (TFun t u) = "\\TFun{" ++ show t ++ "}{" ++ show u ++ "}"
-myShowQT (TProd ts) | all isDuplicable ts = "\\BaseQN{" ++ show (length ts) ++ "}"
+myShowQT (TProd ts) | all isTB ts = "\\BaseQN{" ++ show (length ts) ++ "}"
 myShowQT (TProd ts) = myShowListProd ts
 myShowQT _          = error "Extend the function in case you extend the type"
 
 myShowListProd [x]    = show x
 myShowListProd (x:ts) = show x ++ " \\times " ++ myShowListProd ts
+
+niceShowQT TB         = "B"
+niceShowQT (TSup t)   = "S(" ++ niceShowQT t ++ ")"
+niceShowQT (TSplus t) = "S+(" ++ niceShowQT t ++ ")"
+niceShowQT (TSstar t) = "S*(" ++ niceShowQT t ++ ")"
+niceShowQT (TFun t@(TFun _ _) u) = "(" ++ niceShowQT t ++ ") => " ++ niceShowQT u
+niceShowQT (TFun t u) = niceShowQT t ++ " => " ++ niceShowQT u
+niceShowQT (TProd ts) | all isTB ts = "Q^" ++ show (length ts)  -- This rule is not OK
+niceShowQT (TProd ts) = niceShowListProd ts
+niceShowQT _          = error "Extend the function in case you extend the type"
+
+niceShowListProd [x]    = niceShowQT x
+niceShowListProd (x:ts) = niceShowQT x ++ " <*> " ++ niceShowListProd ts

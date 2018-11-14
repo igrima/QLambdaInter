@@ -173,7 +173,7 @@ normalizeRep = foldr (\an -> unionRep [an]) []
 --  (uses LaTeX macros from z-prelude.tex)
 ---------------------------------------------------------
 instance Show a => Show (Multiset a) where
-  show (MS xs) = showRep xs
+  show (MS xs) = "{{" ++ showRep xs ++ "}}"
 
 fullshow (MS xs) = fullShowRep xs
 
@@ -183,7 +183,7 @@ fullShowRep xs      = "\\Tmulti{" ++ showRep xs ++ "}"
 
 showRep []         = ""
 showRep [(x,n)]    = showN n (show x)
-showRep ((x,n):xs) = showN n (show x) ++ ",\\ " ++ showRep xs  
+showRep ((x,n):xs) = showN n (show x) ++ ", " ++ showRep xs  
   
 showN 0 sx = ""
 showN 1 sx = sx

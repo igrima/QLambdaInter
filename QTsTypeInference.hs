@@ -53,22 +53,26 @@ decorateTerm env r = do (chr,_) <- deduceType env r
                         return chr
 
 deduceType :: Environment -> QTerm -> QTMonad (ChurchQTerm, QType)
-deduceType env (Null t)  =        -- rule Ax0
+deduceType env (Null t0)  =        -- rule Ax0
    do checkAllDuplicable env
-      return (Null t, t)
+      t0' <- applyS_iRule t0
+      return (Null t0', t0')
 deduceType env (QBit b) =         -- rules Ax|0> and Ax|1>
    do checkAllDuplicable env 
-      return (QBit b, QT.tB)
+      tq <- applyS_iRule QT.tB
+      return (QBit b, tq)
 deduceType env (Var x _) =        -- rule Ax
    do tx   <- findTypeInEnv x env
       envB <- restrictEnv env x
       checkAllDuplicable envB
-      return (Var x tx, tx) 
+      tx'  <- applyS_iRule tx
+      return (Var x tx', tx') 
 deduceType env (Lam x tx t _) =
    do newEnv    <- updateEnv (x,tx) env
       (cht, tt) <- deduceType newEnv t
       tlam      <- lamType tx tt
-      return (Lam x tx cht tlam, tlam)
+      tlam'     <- applyS_iRule tlam
+      return (Lam x tx cht tlam', tlam')
 deduceType env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
    error "To Do" {- do (r, tr) <- deduceType env r
                        (s, ts) <- deduceType env s
@@ -78,43 +82,74 @@ deduceType env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGL
 deduceType env (LC mt _) =
     do let tsi = MS.order mt
        (chtsi, tsup) <- deduceTypesForLC env tsi
-       return (linCom chtsi tsup, tsup)
+       tsup' <- applyS_iRule tsup
+       return (linCom chtsi tsup', tsup')
 
 -- COMPLETAR
 
 deduceTypesForLC env [((q,t),n)]     = 
     do checkNonDuplication n env (freeVars t)
        (cht', tt') <- deduceType env t
-       stt' <- produceCompatibleSupTypeFor tt' tt'
+       let stt' = addTSupIfNeeded tt'
        return ([((q,cht'),n)], stt')
 deduceTypesForLC env (((q,t),n):ts) = 
-    do checkNonDuplication n env (freeVars t)
-       envForTs <- trimEnvWrt env t
-       envForT  <- trimEnvWrt env (linCom ts ())
-       checkOverlapIsDuplicable envForTs envForT
+    do checkNonDuplication n env (freeVars t)     -- If the term appears more than once, all free variables must be duplicable
+       envForTs <- trimEnvWrt env t               -- Remove nonDuplicable variables that corresponds to t
+       envForT  <- trimEnvWrt env (linCom ts ())  -- Remove nonDuplicable variables that corresponds to ts
+       checkOverlapIsDuplicable envForTs envForT  -- After removing all freeVars, no nonDuplicable variables must be left out
        (chts', stt') <- deduceTypesForLC envForTs ts
        (cht', tt')   <- deduceType envForT t 
        stt''         <- produceCompatibleSupTypeFor tt' stt'
        return ((((q,cht'),n):chts'), stt'')
 
-       
--- This function is not right!!!!!!!
-produceCompatibleSupTypeFor t1@(TSup t1') (TSup t2') = 
-    do t' <- produceCompatibleSupTypeFor t1' t2'
-       return (tSup t')
-produceCompatibleSupTypeFor t1@(TSup t1') t2 =
-    if (t1' /= t2)
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return t1
-produceCompatibleSupTypeFor t1 t2@(TSup t2') = 
-    if (t1 /= t2')
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return t2
-produceCompatibleSupTypeFor t1 t2 = 
-    if (t1 /= t2)
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return (tSup t1)
-     
+--------------------------------------------------------------------------------------------
+-- Functions to control the proper use of TSups, completing when needed, if TPhS allows it
+--------------------------------------------------------------------------------------------
+produceCompatibleSupTypeFor t1 t2 = fmap addTSupIfNeeded (produceCompatibleTypeFor t1 t2)
+
+addTSupIfNeeded t@(TSup _)   = t
+addTSupIfNeeded t@(TSplus _) = t
+addTSupIfNeeded t            = tSup t      
+
+produceCompatibleTypeFor t1@(TSup t1') t2 = 
+   case t2 of
+     TSup   t2' -> fmap tSup (produceCompatibleTypeFor t1' t2')   -- TSup+TSup     = TSup
+     TSplus t2' -> fmap tSup (produceCompatibleTypeFor t1' t2')   -- TSup+TSplus   = TSup
+     TSstar t2' -> fmap tSup (produceCompatibleTypeFor t1' t2 )   -- TSup+TSstar   = TSup
+     _          -> raiseNonCompatibleTypes t1 t2                  -- TSup+NON-S    = fail
+produceCompatibleTypeFor t1@(TSplus t1') t2 = 
+   case t2 of
+     TSup   t2' -> fmap tSup   (produceCompatibleTypeFor t1' t2') -- TSplus+TSup   = TSup
+     TSplus t2' -> fmap tSplus (produceCompatibleTypeFor t1' t2') -- TSplus+TSplus = TSplus
+     TSstar t2' -> fmap tSplus (produceCompatibleTypeFor t1' t2 ) -- TSplus+TSstar = TSplus
+     _          -> raiseNonCompatibleTypes t1 t2                  -- TSplus+NON-S  = fail
+produceCompatibleTypeFor t1@(TSstar t1') t2 = 
+   case t2 of
+     TSup   t2' -> fmap tSup   (produceCompatibleTypeFor t1  t2') -- TSstar+TSup   = TSup
+     TSplus t2' -> fmap tSplus (produceCompatibleTypeFor t1' t2') -- TSstar+TSplus = TSplus
+     TSstar t2' -> fmap tPhS   (produceCompatibleTypeFor t1' t2') -- TSstar+TSstar = TSstar
+     _          -> produceCompatibleTypeForNoSupTypes t1' t2      -- TSstar+NON-S  = NON-S  (TSstar zero times)
+produceCompatibleTypeFor t1 t2 =                
+   case t2 of
+     TSup   _   -> raiseNonCompatibleTypes t1 t2                  -- NON-S+TSup    = fail
+     TSplus _   -> raiseNonCompatibleTypes t1 t2                  -- NON-S+TSplus  = fail
+     TSstar t2' -> produceCompatibleTypeForNoSupTypes t1 t2'      -- NON-S+TSstar  = NON-S   (TSstar zero times)
+     _          -> produceCompatibleTypeForNoSupTypes t1 t2       -- NON-S+NON-S   = NON-S
+
+-- PRECOND: both arguments are not TSup or TPhS                 
+produceCompatibleTypeForNoSupTypes (TFun ta1 tr1) (TFun ta2 tr2) =
+   do ta' <- produceCompatibleTypeFor ta1 ta2
+      tr' <- produceCompatibleSupTypeFor tr1 tr2
+      return (TFun ta' tr')
+produceCompatibleTypeForNoSupTypes (TProd _) (TProd _) = error "TO DO: ¿Jano?"
+produceCompatibleTypeForNoSupTypes TB TB = return TB
+produceCompatibleTypeForNoSupTypes t1 t2 = raiseNonCompatibleTypes t1 t2
+
+   
+raiseNonCompatibleTypes t1 t2 = raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
+
+
+--------------------------------------------------------------------------------------------
 checkNonDuplication 1 _   _  = return ()
 checkNonDuplication n env xs = do txs <- sequence (map (\x -> findTypeInEnv x env) xs)
                                   if (all isDuplicable txs)
@@ -133,4 +168,4 @@ appType (QT.TFun a b) c = if a == c
                            else raise ("Arguments and parameters do not fit: " ++ show a ++ " expected, but " ++ show c ++ " provided")
 appType _             _ = raise "Non-function in function position"
 
-
+applyS_iRule t = return (tPhS t)

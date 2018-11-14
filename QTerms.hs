@@ -158,9 +158,11 @@ upL t     = Up False t ()
 --     * one used to pretty display with ovalboxes, etc.
 --     * another used to generate Haskell code to build types
 ---------------------------------------------------------
+
 showQT :: BaseQT a -> String
 showQT (QBit k)       = showBase k
-showQT (Null _)       = "\\Null"
+{-
+showQT (Null tn)      = "\\Null_{"  ++ show tn ++ "}"
 showQT (Var x _)      = "\\var{" ++ x ++ "}{}"
 showQT (Lam x tx r _) = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
 showQT (App r s _)    = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
@@ -172,6 +174,7 @@ showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
 showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
 showQT (Up True x _)  = "\\Cast{r}{" ++ showQT x ++ "}{}"
 showQT (Up False x _) = "\\Cast{ell}{" ++ showQT x ++ "}{}"
+-}
 
 showChQT :: ChurchQTerm -> String
 showChQT (QBit k)          = showBase k
