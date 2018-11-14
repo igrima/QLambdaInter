@@ -163,7 +163,7 @@ showQT (Null _)       = "\\Null"
 showQT (Var x _)      = "\\var{" ++ x ++ "}{}"
 showQT (Lam x tx r _) = "\\lam{" ++ x ++ "}{" ++ show tx ++ "}{" ++ showQT r ++ "}"
 showQT (App r s _)    = "\\app{" ++ showQT r ++ "}{" ++ showQT s ++ "}"
-showQT (LC mxs _)     = "\\LinQT{" ++ showLCSum (order mxs) ++ "}{}"
+showQT (LC mxs _)     = "\\LinQT{" ++ showLCSum mxs ++ "}{}"
 showQT (Prod xs _)    = "\\Prod{" ++ showProd xs ++ "}{}"
 showQT (Head x _)     = "\\Head{" ++ showQT x ++ "}{}"
 showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
@@ -179,7 +179,7 @@ showChQT (Lam x tx r tlam) = "\\chlam{" ++ x ++ "}{" ++ show tx ++ "}{"
                                         ++ showChQT r    ++ "}{" ++ show tlam ++ "}"
 showChQT (App r s tapp)    = "\\chapp{" ++ showChQT r  ++ "}{" ++ showChQT s  ++ "}{" ++ show tapp ++ "}"
 showChQT (Null tn)         = "\\Null_{"  ++ show tn ++ "}"
-showChQT (LC mxs tlc)      = "\\LinQT{" ++ showChLCSum (order mxs) ++ "}{" ++ show tlc ++ "}"
+showChQT (LC mxs tlc)      = "\\LinQT{" ++ showChLCSum mxs ++ "}{" ++ show tlc ++ "}"
 showChQT (Prod xs tprod)   = "\\Prod{"  ++ showChProd xs ++ "}{" ++ show tprod ++ "}"
 showChQT (Head x thead)    = "\\Head{" ++ showChQT x ++ "}{" ++ show thead ++ "}"
 showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}"
@@ -189,15 +189,18 @@ showChQT (Up True x tup)   = "\\Cast{r}{" ++ showChQT x ++ "}{" ++ show tup ++ "
 showChQT (Up False x tup)  = "\\Cast{ell}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
 
 -- aux
-showFromList showElem separator []     = ""
-showFromList showElem separator [x]    = showElem x
-showFromList showElem separator (x:xs) = showElem x ++ separator ++ (showFromList showElem separator xs)
+-- showLCSum                              = showFromList showLinBQTItem " + "
+-- showChLCSum                            = showFromList showChLinBQTItem " + "
 
-showLCSum                              = showFromList showLinBQTItem " + "
-showChLCSum                            = showFromList showChLinBQTItem " + "
+showLCSum                              = showMSWith showLinBQTItem " + "
+showChLCSum                            = showMSWith showChLinBQTItem " + "
 
 showProd                               = showFromList showQT " \\times "
 showChProd                             = showFromList showChQT " \\times "
+
+showFromList showElem separator []     = ""
+showFromList showElem separator [x]    = showElem x
+showFromList showElem separator (x:xs) = showElem x ++ separator ++ (showFromList showElem separator xs)
 
 showLinBQTItem ((qc,x), 1)   = showQCxQT (qc, x)
 showLinBQTItem ((qc,x), n)   = showQCxQT (qc, x) ++ " + " ++ showLinBQTItem ((qc,x), n-1)

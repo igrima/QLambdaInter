@@ -31,7 +31,7 @@ module Multiset(Multiset, empty, isEmpty, singleton, isSingleton, fromSingleton
                         , union, intersect, occurs, flatten
                         , equals, included, substract
                         , order, foreach, mAll, foldMS
-                        , fromList, fromMultiList, fullshow)
+                        , fromList, fromMultiList, fullshow, showMSWith)
  where
 
  -- They are represented as ordered lists (by element)
@@ -189,3 +189,9 @@ showN 0 sx = ""
 showN 1 sx = sx
 --showN n sx = sx ++ "^" ++ show n
 showN n sx = sx ++ ",\\ " ++ showN (n-1) sx
+
+showMSWith showElem separator (MS xs) = showSeqWith showElem separator xs
+
+showSeqWith showElem separator []     = ""
+showSeqWith showElem separator [x]    = showElem x
+showSeqWith showElem separator (x:xs) = showElem x ++ separator ++ (showSeqWith showElem separator xs)
