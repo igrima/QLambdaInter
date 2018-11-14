@@ -28,7 +28,7 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
 
-module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, appEnv 
+module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, findTypeInEnv 
                                 , trimEnvWrt, restrictEnv
                                 , checkAllDuplicable, checkOverlapIsDuplicable
                     )
@@ -44,11 +44,12 @@ import Data.List
 -- Environment
 ---------------------------------------------------------
 newtype Environment = E [(Vble, QT.QType)]
+   deriving (Show)
 
 emptyEnv                 :: Environment
 buildEnv                 :: [(Vble, QT.QType)] -> QTMonad Environment
-updateEnv                :: Environment -> Vble -> QT.QType -> QTMonad Environment
-appEnv                   :: Environment -> Vble -> Maybe QT.QType
+updateEnv                :: (Vble, QT.QType) -> Environment -> QTMonad Environment
+findTypeInEnv            :: Vble -> Environment -> QTMonad QT.QType
 
 -- These operations implements the functionality needed by the "linear" feature of
 --  the type system in QTsTypeInference (superpositions can be used exactly one time:
@@ -62,9 +63,12 @@ emptyEnv                   = E []
 
 buildEnv   xts             = fmap E (buildEnvRep xts)
 
-appEnv    (E xts) x        = lookup x xts
+findTypeInEnv x (E xts)    = 
+  case (lookup x xts) of
+    Nothing -> raise ("Term has free variable " ++ x)
+    Just tx -> return tx
 
-updateEnv (E xts) x tx     = fmap E (addToEnvRep (x,tx) xts)
+updateEnv xtx (E xts)      = fmap E (addToEnvRep xtx xts)
 
 -- To be used in rules that should split nonduplicable variables
 --   (it should remove from the environment all freeVars of t that are NOT duplicable)
@@ -122,4 +126,4 @@ intersectEnvRep ((x,tx):xts) xts' =
        Nothing  -> intersectEnvRep xts xts'
        Just tx' -> if (tx==tx') 
                     then fmap ((x,tx):) (intersectEnvRep xts xts')
-                    else raise "Environments are not compatible in check"
+                    else raise "Environments are not compatible in check (intersectEnvRep)"
