@@ -29,8 +29,9 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), tB, tBn, (|=>), tSup, tSups, (|*|), tProd
+module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
                        , isDuplicable, isQBitType, isValidQType
+                       , stripSups, buildFun, buildSup, buildSups
              )
  where
 
@@ -40,7 +41,7 @@ data QType = TB
            | TProd [ QType ]
         deriving (Eq, Ord)
   {- REP.INV.:
-       In (Prod qts), elements of qts do not have Fun on any level.
+       In (Prod qts), len qts >= 2 and its elements do not have Fun on any level.
        In (Fun qt1 qt2), qt1 do not have Fun on any level.
        -- Use functions for construction instead of constructors
        
@@ -53,7 +54,12 @@ isQBitType :: QType -> Bool -- Verifies if it's a value of Phi in the paper (cat
 isQBitType TB         = True
 isQBitType (TFun _ _) = False
 isQBitType (TSup t)   = isQBitType t
-isQBitType (TProd ts) = all isQBitType ts
+isQBitType (TProd ts) = (len ts >= 2) && all isQBitType ts
+        
+isBaseQBitN :: QType -> Bool -- Verifies if it's B^n in the paper (categorical semantics)
+isBaseQBitN TB         = True
+isBaseQBitN (TProd ts) = (len ts >= 2) && all isBaseQBitN ts
+isBaseQBitN _          = False
 
 isValidQType :: QType -> Bool -- Verifies if it's a value of A in the paper (categorical semantics); Types (T)
 isValidQType (TSup t)     = isValidQType t
@@ -71,38 +77,53 @@ isDuplicable _          = False
 tB :: QType
 tB = TB
 
+-- PRECOND: n>0
 tBn :: Int -> QType
+tBn 0 = error ("B^0 is not a valid type")
+tBn 1 = TB
 tBn n = TProd (replicate n tB)
 
 (|=>) :: QType -> QType -> QType
-(|=>) t u = if (isQBitType t)
+(|=>) t u = buildFun id error t u
+buildFun ret rai t u = 
+            if (isQBitType t)
              then if (isValidQType u)
-                   then TFun t u
-                   else error ("Result is not a valid QType for |=>: " ++ show u)
-             else error ("Argument is not a QBitType for |=>: " ++ show t)
+                   then ret (TFun t u)
+                   else rai ("Result is not a valid QType for |=>: " ++ show u)
+             else rai ("Argument is not a QBitType for |=>: " ++ show t)
 
 tSup :: QType -> QType
-tSup t = if (isValidQType t)
-         then TSup t
-         else error ("Argument is not a valid QType for Sup: " ++ show t)
+tSup t = buildSup id error t
+buildSup ret rai t = if (isValidQType t)
+                      then ret (TSup t)
+                      else rai ("Argument is not a valid QType for Sup: " ++ show t)
 
-tSups 0 t = t
-tSups n t@(TSup _) = t
-tSups n t = TSup t
+buildSups ret rai 0 t          = ret t
+buildSups ret rai n t@(TSup _) = ret t
+buildSups ret rai n t          = buildSup ret rai t
 
-(|*|) :: QType -> QType -> QType         
-(TProd ts) |*| (TProd ts')                 = TProd (ts++ts')
-(TProd ts) |*| t'                          = TProd (ts++[t'])
-t          |*| (TProd ts') | isQBitType t  = TProd (t:ts')
-t          |*| t'          | isQBitType t 
-                          && isQBitType t' = TProd [t,t']         
+(|*|) :: QType -> QType -> QType
+(|*|) = buildProd id error
+buildProd ret rai (TProd ts) (TProd ts') = ret (TProd (ts++ts'))
+buildProd ret rai (TProd ts) t'          = if isQBitType t'
+                                            then ret (TProd (ts++[t']))
+                                            else rai ("Invalid type for TProd: " ++ show t')
+buildProd ret rai t          (TProd ts') = if isQBitType t
+                                            then ret (TProd (t:ts'))
+                                            else rai ("Invalid type for TProd: " ++ show t)
+buildProd ret rai t          t'          = if (isQBitType t)
+                                            then if (isQBitType t')
+                                                  then ret (TProd [t,t'])
+                                                  else rai ("Invalid type for TProd: " ++ show t')
+                                            else rai ("Invalid type for TProd: " ++ show t)
 
 tProd :: [ QType ] -> QType
-tProd ts = if (all isQBitType ts) 
-           --then TProd ts 
-           then foldr1 (|*|) ts
-           else error ("Some argument is not a QBitType: " ++ show ts)
-         
+tProd = buildProds id error
+buildProds ret rai ts = foldr1 (buildProd ret rai) ts
+
+stripSups (TSup t) = (\(n,t)->(n+1, t)) (stripSups t)
+stripSups t        = (0, t)
+
 ---------------------------------------------------------
 -- Show
 --   (uses LaTeX macros from z-preamble)

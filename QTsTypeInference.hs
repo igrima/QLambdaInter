@@ -81,61 +81,65 @@ deduceType env (LC mt _) =
    do let tsi = MS.order mt
       (chtsi, tsup) <- deduceTypesForLC env tsi
       return (linCom chtsi tsup, tsup)
+deduceType env (Prod [] _)  = raise ("Cannot have an empty Prod")
+deduceType env (Prod [_] _) = raise ("Cannot have a singleton Prod")
+deduceType env (Prod ts _)  =
+   do (chts, tts) <- deduceTypesForProd env ts
+      tprod       <- prodType tts
+      return (Prod chts tprod, tprod)
+deduceType env (Head t _) =
+   do (cht, tt) <- deduceType env t
+      (thead, _) <- unBnType tt
+      return (Head cht thead, thead)
+deduceType env (Tail t _) =
+   do (cht, tt) <- deduceType env t
+      (_, ttail) <- unBnType tt
+      return (Tail cht ttail, ttail)
+      
+
+deduceType _ _ = raise "TODO"
+
+
+
 
 deduceTypesForLC env [((alpha,t),n)]     = 
    do checkNonDuplication n env (freeVars t)
       (cht', tt') <- deduceType env t
-      stt' <- produceCompatibleTypeFor tt' tt'  -- Adds a TSup if necessary
+      stt' <- produceCompatibleSupTypeFor tt' tt'  -- Adds a TSup if necessary
                 ("This cannot happen, something went oddly wrong") -- This cannot fail, but added for consistency
-      return ([((alpha,cht'),n)], (QT.tSups 1 stt'))
+      return ([((alpha,cht'),n)], stt')
 deduceTypesForLC env (((alpha,t),n):ts) = 
    do checkNonDuplication n env (freeVars t)
       envForTs <- trimEnvWrt env t
-      envForT  <- trimEnvWrt env (linCom ts ())
+      envForT  <- trimEnvWrts env ts
       checkOverlapIsDuplicable envForTs envForT
       (chts', stt') <- deduceTypesForLC envForTs ts
       (cht', tt')   <- deduceType envForT t 
-      stt''         <- produceCompatibleTypeFor tt' stt'
+      stt''         <- produceCompatibleSupTypeFor tt' stt'
                          ("Types are not compatible for Linear Combinations (" ++ show tt' ++ " --- " ++ show stt' ++ ")")
-      return ((((alpha,cht'),n):chts'), (QT.tSups 1 stt''))
+      return ((((alpha,cht'),n):chts'), stt'')
 
-       
+deduceTypesForProd env [t] = 
+   do (cht, tt) <- deduceType env t
+      return ([cht], tt)
+deduceTypesForProd env (t:ts) = 
+   do envForTs <- trimEnvWrt env t
+      envForT  <- trimEnvWrts env ts
+      checkOverlapIsDuplicable envForTs envForT
+      (cht', tt')   <- deduceType envForT t
+      (chts', tts') <- deduceTypesForProd envForTs ts
+      return (cht':chts', tt':tts')
+
 -- IDEA: this function should be used to replace several uses of rule (S_I)
--- This function is not right!!!!!!!
-{- OLD VERSION OF THIS HERE... SEE NEW DOWN THERE
-produceCompatibleSupTypeFor (TSup t1') (TSup t2') = 
-    do t' <- produceCompatibleSupTypeFor t1' t2'
-       return (tSup t')
-produceCompatibleSupTypeFor t1@(TSup t1') t2 =
-    if (t1' /= t2)
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return t1
-produceCompatibleSupTypeFor t1 t2@(TSup t2') = 
-    if (t1 /= t2')
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return t2
-produceCompatibleSupTypeFor t1 t2 = 
-    if (t1 /= t2)
-     then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
-     else return (tSup t1)
--}
-
-stripSups (TSup t) = (\(n,t)->(n+1, t)) (stripSups t)
-stripSups t        = (0, t)
-
-{- SECOND VERSION, STILL NOT WHAT WE WANT
-produceCompatibleSupTypeFor t1 t2 = 
-   let (_, t1') = stripSups t1
-       (_, t2') = stripSups t2
-    in if t1' == t2' 
-       then return (TSup t1')
-       else raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")") -}
+produceCompatibleSupTypeFor t1 t2 errmsg = 
+  do t' <- produceCompatibleTypeFor t1 t2 errmsg
+     supType t'
 
 produceCompatibleTypeFor t1 t2 errmsg =
-  let (n1, t1') = stripSups t1
-      (n2, t2') = stripSups t2
+  let (n1, t1') = QT.stripSups t1
+      (n2, t2') = QT.stripSups t2
    in if (t1' == t2')
-       then return (QT.tSups (max n1 n2) t1')
+       then return (tSups (max n1 n2) t1')
        else raise errmsg
      
 checkNonDuplication 1 _   _  = return ()
@@ -148,15 +152,33 @@ checkNonDuplication n env xs = do txs <- sequence (map (\x -> findTypeInEnv x en
 ---------------------------------------------------------
 -- AUXILIARIES to build types inferred
 ---------------------------------------------------------
--- PRECOND: tr and ts are canonical
+-- PRECOND: arguments are canonical
 --lamType tx tr = return (QT.TFun tx tr)  -- This way, it does not verify formation properties
-lamType tx tr = return (tx QT.|=> tr)
+lamType = QT.buildFun return raise
+                --return (tx QT.|=> tr) -- This fails with error, instead of raise, like above.
 
--- PRECOND: tr and ts are canonical
-appType ft tt = let (nf, ft') = stripSups ft
-                    (nt, tt') = stripSups tt
+-- PRECOND: arguments are canonical
+appType ft tt = let (nf, ft') = QT.stripSups ft
+                    (nt, tt') = QT.stripSups tt
                  in case ft' of
                      QT.TFun b a -> do produceCompatibleTypeFor b tt'
                                          ("Arguments and parameters do not fit: " ++ show b ++ " expected, but " ++ show tt' ++ " provided")
                                        return (tSups (max nf nt) a)
                      _           -> raise "Non-function in function position"
+
+supType = QT.buildSups return raise 1
+
+prodType = QT.buildProds return raise
+
+-- PRECOND: argument is canonical
+unBnType tt = if (isBaseQBitN tt)
+               then case tt of
+                      QT.TProd (QT.TB:t':ts) -> 
+                           do ts' <- prodType (t':ts)
+                              return (QT.tB, ts')
+                      QT.TProd (_:_:_)       ->
+                           raise ("Argument is not cannonical in unBnType")
+                      _                      ->
+                           raise ("B^n with n<2 in Head or Tail")
+               else raise ("B^n with n<2 in Head or Tail")
+

@@ -29,7 +29,7 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, findTypeInEnv 
-                                , trimEnvWrt, restrictEnv
+                                , trimEnvWrt, trimEnvWrts, restrictEnv
                                 , checkAllDuplicable, checkOverlapIsDuplicable
                     )
  where
@@ -55,6 +55,7 @@ findTypeInEnv            :: Vble -> Environment -> QTMonad QT.QType
 --  the type system in QTsTypeInference (superpositions can be used exactly one time:
 --  we call them nonDuplicable types)
 trimEnvWrt               :: Ord a => Environment -> BaseQT a -> QTMonad Environment
+trimEnvWrts              :: Ord a => Environment -> [BaseQT a] -> QTMonad Environment
 restrictEnv              :: Environment -> Vble -> QTMonad Environment
 checkAllDuplicable       :: Environment -> QTMonad ()
 checkOverlapIsDuplicable :: Environment -> Environment -> QTMonad ()
@@ -74,6 +75,8 @@ updateEnv xtx (E xts)      = fmap E (addToEnvRep xtx xts)
 -- To be used in rules that should split nonduplicable variables
 --   (it should remove from the environment all freeVars of t that are NOT duplicable)
 trimEnvWrt (E xts) t       = fmap E (trimEnvRep xts (freeVars t))
+
+trimEnvWrts (E xts) ts     = fmap E (trimEnvRep xts (freeVars ts))
 
 restrictEnv (E xts) x      = return (E (restrictEnvRep xts x))
 

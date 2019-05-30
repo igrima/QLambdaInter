@@ -109,19 +109,34 @@ isLam _             = False
 isGround :: Ord a => BaseQT a -> Bool
 isGround t = freeVars t == []
 
-freeVars :: Ord a => BaseQT a -> [Vble]
-freeVars (Var x _)     = [x]
-freeVars (Lam x _ t _) = freeVars t \\ [x]
-freeVars (App t u _)   = freeVars t `L.union` freeVars u
-freeVars (LC mt _)     = foldMS (\((_,t),_) fvs -> freeVars t `L.union` fvs) [] mt
-freeVars (Prod ts _)   = foldr L.union [] (map freeVars ts)
-freeVars (Head t _)    = freeVars t
-freeVars (Tail t _)    = freeVars t
-freeVars (Proj _ t _)  = freeVars t
-freeVars (QIf t u _)   = freeVars t `L.union` freeVars u
-freeVars (Up _ t _)    = freeVars t
-freeVars _             = []
+class HasFreeVars t where 
+  freeVars :: t -> [Vble]
 
+instance Ord a => HasFreeVars (BaseQT a) where
+  freeVars (Var x _)     = [x]
+  freeVars (Lam x _ t _) = freeVars t \\ [x]
+  freeVars (App t u _)   = freeVars t `L.union` freeVars u
+  freeVars (LC mt _)     = foldMS (\((_,t),_) fvs -> freeVars t `L.union` fvs) [] mt
+  freeVars (Prod ts _)   = foldr L.union [] (map freeVars ts)
+  freeVars (Head t _)    = freeVars t
+  freeVars (Tail t _)    = freeVars t
+  freeVars (Proj _ t _)  = freeVars t
+  freeVars (QIf t u _)   = freeVars t `L.union` freeVars u
+  freeVars (Up _ t _)    = freeVars t
+  freeVars _             = []
+
+instance HasFreeVars t => HasFreeVars [t] where
+  freeVars []     = []
+  freeVars (t:ts) = freeVars t ++ freeVars ts
+
+instance (HasFreeVars t, HasFreeVars t') => HasFreeVars (t,t') where
+  freeVars (t,t') = freeVars t ++ freeVars t'
+
+instance HasFreeVars Int where
+  freeVars _ = []
+
+instance HasFreeVars QComplex where
+  freeVars _ = []
 ---------------------------------------------------------
 -- Functions for easy construction
 ---------------------------------------------------------
