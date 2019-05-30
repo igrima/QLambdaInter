@@ -30,12 +30,12 @@
 
 module QTsTypeInference where
 
+import Data.List
 import Multiset as MS
 import QTypes as QT
 import QTerms
 import QTMonad
 import Error
-import List
 import QEnvironments
 
 
@@ -61,45 +61,49 @@ deduceType env (QBit b) =         -- rules Ax|0> and Ax|1>
       return (QBit b, QT.tB)
 deduceType env (Var x _) =        -- rule Ax
    do tx   <- findTypeInEnv x env
-      envB <- restrictEnv env x
-      checkAllDuplicable envB
+      envB <- restrictEnv env x          -- TODO: verify with Jano why tx is not checked
+      checkAllDuplicable envB            --       in this checkAll
       return (Var x tx, tx) 
 deduceType env (Lam x tx t _) =
-   do newEnv    <- updateEnv (x,tx) env
+   do newEnv    <- updateEnv (x,tx) env  -- TODO: check that tx is Phi (isQBitType)
       (cht, tt) <- deduceType newEnv t
       tlam      <- lamType tx tt
       return (Lam x tx cht tlam, tlam)
-deduceType env (App r s _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
-   error "To Do" {- do (r, tr) <- deduceType env r
-                       (s, ts) <- deduceType env s
-                       tapp    <- appType tr ts
-                       return (App r s tapp, tapp)
-                 -}
+deduceType env (App t u _) = -- CAMBIAR!!! HAY QUE CHEQUEAR CUAL DE LAS DOS REGLAS USAR!!!!!
+   do envForU <- trimEnvWrt env t
+      envForT <- trimEnvWrt env u
+      checkOverlapIsDuplicable envForT envForU
+      (cht', tt') <- deduceType envForT t
+      (chu', tu') <- deduceType envForU u
+      tr' <- appType tt' tu'
+      return (App cht' chu' tr', tr')
 deduceType env (LC mt _) =
-    do let tsi = MS.order mt
-       (chtsi, tsup) <- deduceTypesForLC env tsi
-       return (linCom chtsi tsup, tsup)
+   do let tsi = MS.order mt
+      (chtsi, tsup) <- deduceTypesForLC env tsi
+      return (linCom chtsi tsup, tsup)
 
--- COMPLETAR
-
-deduceTypesForLC env [((q,t),n)]     = 
-    do checkNonDuplication n env (freeVars t)
-       (cht', tt') <- deduceType env t
-       stt' <- produceCompatibleSupTypeFor tt' tt'
-       return ([((q,cht'),n)], stt')
-deduceTypesForLC env (((q,t),n):ts) = 
-    do checkNonDuplication n env (freeVars t)
-       envForTs <- trimEnvWrt env t
-       envForT  <- trimEnvWrt env (linCom ts ())
-       checkOverlapIsDuplicable envForTs envForT
-       (chts', stt') <- deduceTypesForLC envForTs ts
-       (cht', tt')   <- deduceType envForT t 
-       stt''         <- produceCompatibleSupTypeFor tt' stt'
-       return ((((q,cht'),n):chts'), stt'')
+deduceTypesForLC env [((alpha,t),n)]     = 
+   do checkNonDuplication n env (freeVars t)
+      (cht', tt') <- deduceType env t
+      stt' <- produceCompatibleTypeFor tt' tt'  -- Adds a TSup if necessary
+                ("This cannot happen, something went oddly wrong") -- This cannot fail, but added for consistency
+      return ([((alpha,cht'),n)], (QT.tSups 1 stt'))
+deduceTypesForLC env (((alpha,t),n):ts) = 
+   do checkNonDuplication n env (freeVars t)
+      envForTs <- trimEnvWrt env t
+      envForT  <- trimEnvWrt env (linCom ts ())
+      checkOverlapIsDuplicable envForTs envForT
+      (chts', stt') <- deduceTypesForLC envForTs ts
+      (cht', tt')   <- deduceType envForT t 
+      stt''         <- produceCompatibleTypeFor tt' stt'
+                         ("Types are not compatible for Linear Combinations (" ++ show tt' ++ " --- " ++ show stt' ++ ")")
+      return ((((alpha,cht'),n):chts'), (QT.tSups 1 stt''))
 
        
+-- IDEA: this function should be used to replace several uses of rule (S_I)
 -- This function is not right!!!!!!!
-produceCompatibleSupTypeFor t1@(TSup t1') (TSup t2') = 
+{- OLD VERSION OF THIS HERE... SEE NEW DOWN THERE
+produceCompatibleSupTypeFor (TSup t1') (TSup t2') = 
     do t' <- produceCompatibleSupTypeFor t1' t2'
        return (tSup t')
 produceCompatibleSupTypeFor t1@(TSup t1') t2 =
@@ -114,23 +118,45 @@ produceCompatibleSupTypeFor t1 t2 =
     if (t1 /= t2)
      then raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")")
      else return (tSup t1)
+-}
+
+stripSups (TSup t) = (\(n,t)->(n+1, t)) (stripSups t)
+stripSups t        = (0, t)
+
+{- SECOND VERSION, STILL NOT WHAT WE WANT
+produceCompatibleSupTypeFor t1 t2 = 
+   let (_, t1') = stripSups t1
+       (_, t2') = stripSups t2
+    in if t1' == t2' 
+       then return (TSup t1')
+       else raise ("Types are not compatible for Linear Combinations (" ++ show t1 ++ " --- " ++ show t2 ++ ")") -}
+
+produceCompatibleTypeFor t1 t2 errmsg =
+  let (n1, t1') = stripSups t1
+      (n2, t2') = stripSups t2
+   in if (t1' == t2')
+       then return (QT.tSups (max n1 n2) t1')
+       else raise errmsg
      
 checkNonDuplication 1 _   _  = return ()
 checkNonDuplication n env xs = do txs <- sequence (map (\x -> findTypeInEnv x env) xs)
                                   if (all isDuplicable txs)
                                    then return ()
                                    else raise "Non linear use of a variable"
-     
+
+
 ---------------------------------------------------------
 -- AUXILIARIES to build types inferred
 ---------------------------------------------------------
 -- PRECOND: tr and ts are canonical
-lamType tx tr = return (QT.TFun tx tr)
+--lamType tx tr = return (QT.TFun tx tr)  -- This way, it does not verify formation properties
+lamType tx tr = return (tx QT.|=> tr)
 
 -- PRECOND: tr and ts are canonical
-appType (QT.TFun a b) c = if a == c
-                           then return b
-                           else raise ("Arguments and parameters do not fit: " ++ show a ++ " expected, but " ++ show c ++ " provided")
-appType _             _ = raise "Non-function in function position"
-
-
+appType ft tt = let (nf, ft') = stripSups ft
+                    (nt, tt') = stripSups tt
+                 in case ft' of
+                     QT.TFun b a -> do produceCompatibleTypeFor b tt'
+                                         ("Arguments and parameters do not fit: " ++ show b ++ " expected, but " ++ show tt' ++ " provided")
+                                       return (tSups (max nf nt) a)
+                     _           -> raise "Non-function in function position"

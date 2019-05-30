@@ -69,6 +69,7 @@ findTypeInEnv x (E xts)    =
     Just tx -> return tx
 
 updateEnv xtx (E xts)      = fmap E (addToEnvRep xtx xts)
+                          -- fmap works with the list within the monad...
 
 -- To be used in rules that should split nonduplicable variables
 --   (it should remove from the environment all freeVars of t that are NOT duplicable)

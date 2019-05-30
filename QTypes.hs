@@ -29,7 +29,7 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
+module QTypes(QType(..), tB, tBn, (|=>), tSup, tSups, (|*|), tProd
                        , isDuplicable, isQBitType, isValidQType
              )
  where
@@ -49,13 +49,13 @@ data QType = TB
        ValidQType ::= QBitType | QBitType => ValidQType | S(ValidQType)
   -}
         
-isQBitType :: QType -> Bool
+isQBitType :: QType -> Bool -- Verifies if it's a value of Phi in the paper (categorical semantics); QBit Types (Q)
 isQBitType TB         = True
 isQBitType (TFun _ _) = False
 isQBitType (TSup t)   = isQBitType t
 isQBitType (TProd ts) = all isQBitType ts
 
-isValidQType :: QType -> Bool
+isValidQType :: QType -> Bool -- Verifies if it's a value of A in the paper (categorical semantics); Types (T)
 isValidQType (TSup t)     = isValidQType t
 isValidQType (TFun t1 t2) = isQBitType t1 && isValidQType t2
 isValidQType t            = isQBitType t
@@ -86,15 +86,21 @@ tSup t = if (isValidQType t)
          then TSup t
          else error ("Argument is not a valid QType for Sup: " ++ show t)
 
+tSups 0 t = t
+tSups n t@(TSup _) = t
+tSups n t = TSup t
+
 (|*|) :: QType -> QType -> QType         
-(TProd ts) |*| (TProd ts') = TProd (ts++ts')
-(TProd ts) |*| t'          = TProd (ts++[t'])
-t          |*| (TProd ts') = TProd (t:ts')
-t          |*| t'          = TProd [t,t']         
+(TProd ts) |*| (TProd ts')                 = TProd (ts++ts')
+(TProd ts) |*| t'                          = TProd (ts++[t'])
+t          |*| (TProd ts') | isQBitType t  = TProd (t:ts')
+t          |*| t'          | isQBitType t 
+                          && isQBitType t' = TProd [t,t']         
 
 tProd :: [ QType ] -> QType
 tProd ts = if (all isQBitType ts) 
-           then TProd ts 
+           --then TProd ts 
+           then foldr1 (|*|) ts
            else error ("Some argument is not a QBitType: " ++ show ts)
          
 ---------------------------------------------------------

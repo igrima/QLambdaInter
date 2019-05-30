@@ -63,14 +63,12 @@ instance Functor QTMonad where
   fmap f (QTM fs) = QTM (\mem -> let xmo = fs mem in fmap (\(x,m,o) -> (f x,m,o)) xmo)
 
   
--- Only for GHC 
-{-
+-- Only for GHC
 instance Applicative QTMonad where
   pure x = QTM (\mem -> return (x,mem,""))
   (QTM ff) <*> (QTM fx) = QTM (\mem0 -> do (f,mem1,out1) <- ff mem0
                                            (x,mem2,out2) <- fx mem1
-                                           return (f x,mem2,out1++out2))
--}                                           
+                                           return (f x,mem2,out1++out2))                                          
 
 instance Monad QTMonad where
   return x = QTM (\mem -> return (x,mem,""))

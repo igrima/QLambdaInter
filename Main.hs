@@ -75,7 +75,7 @@ ejForReduce1 = app (app (lam "x" tB (lam "y" tB (var "x"))) k0) k1
 
 ejForReduce2 = app (app (lam "x" tB (lam "y" (tB |=> tB) (var "x"))) ejForReduce1) ejId
 
-ejCNot = lam "x" tB (var "x" <*> var "x")
+ejCNot = lam "x" tB (var "x" <**> var "x")
 
 ejKPlus = (1 / sq2) .> (ejZero <+> ejOne)
 
@@ -85,6 +85,7 @@ ejMeCNotKPlus = proj 1 (upR (app ejCNot ejKPlus))
 
 --ejReduceMore = 
 
---main = do
---    writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
---    return ()
+main = do
+--   writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
+   writeFile "Example/body.tex" (showChQT (decorate ejForReduce1))
+   return ()

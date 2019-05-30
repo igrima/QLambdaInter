@@ -95,7 +95,7 @@ getType (QIf _ _ t)   = t
 getType (Up _ _ t)    = t
 
 -- PRECOND: the term is ground and well typed 
-isBase :: BaseQT a -> Bool
+isBase :: BaseQT a -> Bool -- Verifies if it's a value of b in the paper (categorical semantics); Basis terms (B)
 isBase (QBit _)      = True
 isBase (Var _ _)     = True
 isBase (Lam _ _ _ _) = True
@@ -130,17 +130,18 @@ k0, k1 :: QTerm
 k0        = QBit KZero
 k1        = QBit KOne
 
-nullV t   = Null (tSup t)
+nullV t   = Null t
 
 var x     = Var x ()
 lam x t e = Lam x t e ()
 app r s   = App r s ()
 
-a .> t     = LC (singleton (a,t)) ()
+--a .> t     = LC (singleton (a,t)) ()
+a .> t     = LC (MS.foreach (\(b,t')->(a*b,t')) (asLinCom t)) ()
 t <+> u    = LC (MS.union (asLinCom t) (asLinCom u)) ()
 linCom tsi typ = LC (MS.fromMultiList tsi) typ
 
-t <*> u   = Prod (asList t ++ asList u) ()
+t <**> u   = Prod (asList t ++ asList u) ()
   where asList (Prod ts _) = ts 
         asList t           = [t]
 
