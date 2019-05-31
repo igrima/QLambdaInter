@@ -59,8 +59,8 @@ data BaseQT a =
               | Proj Int (BaseQT a) a
                 -- Alternatives
               | QIf (BaseQT a) (BaseQT a) a
-                -- Castings (True==Right, False==Left)
-              | Up Bool (BaseQT a) a
+                -- Casting
+              | Up (BaseQT a) a
         deriving (Eq, Ord, Show)
    {-
       Type parameter a is a technique for processing church style typing.
@@ -92,7 +92,7 @@ getType (Head _ t)    = t
 getType (Tail _ t)    = t
 getType (Proj _ _ t)  = t
 getType (QIf _ _ t)   = t
-getType (Up _ _ t)    = t
+getType (Up _ t)      = t
 
 -- PRECOND: the term is ground and well typed 
 isBase :: BaseQT a -> Bool -- Verifies if it's a value of b in the paper (categorical semantics); Basis terms (B)
@@ -122,7 +122,7 @@ instance Ord a => HasFreeVars (BaseQT a) where
   freeVars (Tail t _)    = freeVars t
   freeVars (Proj _ t _)  = freeVars t
   freeVars (QIf t u _)   = freeVars t `L.union` freeVars u
-  freeVars (Up _ t _)    = freeVars t
+  freeVars (Up t _)      = freeVars t
   freeVars _             = []
 
 instance HasFreeVars t => HasFreeVars [t] where
@@ -164,8 +164,7 @@ qHead t   = Head t ()
 qTail t   = Tail t ()
 proj j t  = Proj j t ()
 qIf t u   = QIf t u ()
-upR t     = Up True t ()
-upL t     = Up False t ()
+up t      = Up t ()
         
 ---------------------------------------------------------
 -- Show
@@ -186,8 +185,7 @@ showQT (Head x _)     = "\\Head{" ++ showQT x ++ "}{}"
 showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
 showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
 showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
-showQT (Up True x _)  = "\\Cast{r}{" ++ showQT x ++ "}{}"
-showQT (Up False x _) = "\\Cast{ell}{" ++ showQT x ++ "}{}"
+showQT (Up x _)       = "\\Cast{}{" ++ showQT x ++ "}{}"
 
 showChQT :: ChurchQTerm -> String
 showChQT (QBit k)          = showBase k
@@ -202,8 +200,7 @@ showChQT (Head x thead)    = "\\Head{" ++ showChQT x ++ "}{" ++ show thead ++ "}
 showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}"
 showChQT (Proj j x tproj)  = "\\Proj{" ++ show j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
 showChQT (QIf x y tqif)    = "\\Ite{" ++ showChQT x ++ "}{" ++ showChQT y ++ "}{" ++ show tqif ++ "}"
-showChQT (Up True x tup)   = "\\Cast{r}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
-showChQT (Up False x tup)  = "\\Cast{ell}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
+showChQT (Up x tup)        = "\\Cast{}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
 
 -- aux
 -- showLCSum                              = showFromList showLinBQTItem " + "

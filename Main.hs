@@ -79,7 +79,7 @@ ejCNot = lam "x" tB (var "x" <**> var "x")
 
 ejKPlus = (1 / sq2) .> (ejZero <+> ejOne)
 
-ejMeCNotKPlus = proj 1 (upR (app ejCNot ejKPlus))
+ejMeCNotKPlus = proj 1 (up (app ejCNot ejKPlus))
 
 --ejReduceOne = reduceOne (decorate ejIdInOne)
 

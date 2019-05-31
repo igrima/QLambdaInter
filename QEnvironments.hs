@@ -30,7 +30,7 @@
 
 module QEnvironments(Environment, emptyEnv, buildEnv, updateEnv, findTypeInEnv 
                                 , trimEnvWrt, trimEnvWrts, restrictEnv
-                                , checkAllDuplicable, checkOverlapIsDuplicable
+                                , checkAllNonLinear, checkOverlapIsNonLinear
                     )
  where
 
@@ -53,12 +53,12 @@ findTypeInEnv            :: Vble -> Environment -> QTMonad QT.QType
 
 -- These operations implements the functionality needed by the "linear" feature of
 --  the type system in QTsTypeInference (superpositions can be used exactly one time:
---  we call them nonDuplicable types)
+--  we call them Linear types)
 trimEnvWrt               :: Ord a => Environment -> BaseQT a -> QTMonad Environment
 trimEnvWrts              :: Ord a => Environment -> [BaseQT a] -> QTMonad Environment
 restrictEnv              :: Environment -> Vble -> QTMonad Environment
-checkAllDuplicable       :: Environment -> QTMonad ()
-checkOverlapIsDuplicable :: Environment -> Environment -> QTMonad ()
+checkAllNonLinear        :: Environment -> QTMonad ()
+checkOverlapIsNonLinear  :: Environment -> Environment -> QTMonad ()
 
 emptyEnv                   = E []
 
@@ -72,22 +72,22 @@ findTypeInEnv x (E xts)    =
 updateEnv xtx (E xts)      = fmap E (addToEnvRep xtx xts)
                           -- fmap works with the list within the monad...
 
--- To be used in rules that should split nonduplicable variables
---   (it should remove from the environment all freeVars of t that are NOT duplicable)
+-- To be used in rules that should split linear variables
+--   (it should remove from the environment all freeVars of t that are linear)
 trimEnvWrt (E xts) t       = fmap E (trimEnvRep xts (freeVars t))
 
 trimEnvWrts (E xts) ts     = fmap E (trimEnvRep xts (freeVars ts))
 
 restrictEnv (E xts) x      = return (E (restrictEnvRep xts x))
 
-checkAllDuplicable (E xts) = checkAllDuplicableRep xts
+checkAllNonLinear (E xts)  = checkAllNonLinearRep xts
                             
--- To be used in rules that should split nonduplicable variables
---  (the overlap of both trims should be duplicable)
+-- To be used in rules that should split linear variables
+--  (the overlap of both trims should be non linear)
 -- PRECOND: environments are compatible
-checkOverlapIsDuplicable (E xts) (E xts') = 
+checkOverlapIsNonLinear (E xts) (E xts') = 
     do xts'' <- intersectEnvRep xts xts'
-       checkAllDuplicableRep xts''
+       checkAllNonLinearRep xts''
 
 ----------------------------------------------
 -- Environment representation manipulation
@@ -102,26 +102,26 @@ addToEnvRep (xt@(x,_)) xts = case lookup x xts of
                               Just _ -> raise ("Variable " ++ x ++ " already in the Environment")
                               _      -> return (xt:xts)
 
--- It removes all the variables in xs from the environment, it their types are nonDuplicable
+-- It removes all the variables in xs from the environment, it their types are Linear
 trimEnvRep xts []     = return xts
 trimEnvRep xts (x:xs) = 
   case (lookup x xts) of
     Nothing -> raise ("There is no " ++ x ++ " in the environment")
-    Just tx -> if (isDuplicable tx)
+    Just tx -> if (not (isLinear tx))
                 then trimEnvRep xts xs
                 else trimEnvRep (restrictEnvRep xts x) xs
 
--- It removes x from the environment, if its type is nonDuplicable
+-- It removes x from the environment, if its type is Linear
 restrictEnvRep [] _ = []
 restrictEnvRep ((xt'@(x', t')):xts) x =
-           if x==x' && (not (isDuplicable t'))
+           if x==x' && (isLinear t')
             then restrictEnvRep xts x
             else (x',t') : restrictEnvRep xts x
 
-checkAllDuplicableRep []          = return ()
-checkAllDuplicableRep ((_,t):xts) = if (isDuplicable t) 
-                                     then checkAllDuplicableRep xts
-                                     else raise "Nonduplicable variables discarded in environment"
+checkAllNonLinearRep []          = return ()
+checkAllNonLinearRep ((_,t):xts) = if (not (isLinear t))
+                                     then checkAllNonLinearRep xts
+                                     else raise "Linear variables discarded in environment"
                                        
 -- PRECOND: both lists are compatible
 intersectEnvRep []           _    = return []

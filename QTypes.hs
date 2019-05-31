@@ -30,8 +30,9 @@
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
 module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
-                       , isDuplicable, isQBitType, isValidQType
-                       , stripSups, buildFun, buildSup, buildSups
+                       , isLinear, isQBitType, isValidQType
+                       , isBaseQBitN, stripSups, buildFun, buildSup
+                       , buildSups, buildProd
              )
  where
 
@@ -54,11 +55,11 @@ isQBitType :: QType -> Bool -- Verifies if it's a value of Phi in the paper (cat
 isQBitType TB         = True
 isQBitType (TFun _ _) = False
 isQBitType (TSup t)   = isQBitType t
-isQBitType (TProd ts) = (len ts >= 2) && all isQBitType ts
+isQBitType (TProd ts) = (length ts >= 2) && all isQBitType ts
         
 isBaseQBitN :: QType -> Bool -- Verifies if it's B^n in the paper (categorical semantics)
 isBaseQBitN TB         = True
-isBaseQBitN (TProd ts) = (len ts >= 2) && all isBaseQBitN ts
+isBaseQBitN (TProd ts) = (length ts >= 2) && all isBaseQBitN ts
 isBaseQBitN _          = False
 
 isValidQType :: QType -> Bool -- Verifies if it's a value of A in the paper (categorical semantics); Types (T)
@@ -66,10 +67,8 @@ isValidQType (TSup t)     = isValidQType t
 isValidQType (TFun t1 t2) = isQBitType t1 && isValidQType t2
 isValidQType t            = isQBitType t
 
-isDuplicable :: QType -> Bool
-isDuplicable TB         = True
-isDuplicable (TProd ts) = all isDuplicable ts
-isDuplicable _          = False
+isLinear :: QType -> Bool
+isLinear t = not (isBaseQBitN t)
 
 ---------------------------------------------------------
 -- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
@@ -93,17 +92,19 @@ buildFun ret rai t u =
              else rai ("Argument is not a QBitType for |=>: " ++ show t)
 
 tSup :: QType -> QType
-tSup t = buildSup id error t
-buildSup ret rai t = if (isValidQType t)
-                      then ret (TSup t)
-                      else rai ("Argument is not a valid QType for Sup: " ++ show t)
+tSup = buildSups id error 1
 
 buildSups ret rai 0 t          = ret t
 buildSups ret rai n t@(TSup _) = ret t
 buildSups ret rai n t          = buildSup ret rai t
 
+buildSup ret rai t = if (isValidQType t)
+                      then ret (TSup t)
+                      else rai ("Argument is not a valid QType for Sup: " ++ show t)
+
 (|*|) :: QType -> QType -> QType
 (|*|) = buildProd id error
+buildProd :: (QType -> b) -> (String -> b) -> QType -> QType -> b
 buildProd ret rai (TProd ts) (TProd ts') = ret (TProd (ts++ts'))
 buildProd ret rai (TProd ts) t'          = if isQBitType t'
                                             then ret (TProd (ts++[t']))
@@ -117,12 +118,21 @@ buildProd ret rai t          t'          = if (isQBitType t)
                                                   else rai ("Invalid type for TProd: " ++ show t')
                                             else rai ("Invalid type for TProd: " ++ show t)
 
+-- tProd ts = foldr1 (|*|) ts
 tProd :: [ QType ] -> QType
-tProd = buildProds id error
-buildProds ret rai ts = foldr1 (buildProd ret rai) ts
+tProd [t]    = t
+tProd (t:ts) = t |*| tProd ts
 
 stripSups (TSup t) = (\(n,t)->(n+1, t)) (stripSups t)
 stripSups t        = (0, t)
+
+---------------------------------------------------------
+-- QTypes Representation Normalization
+---------------------------------------------------------
+normQT (TSup t)     = tSup (normQT t)
+normQT (TFun t1 t2) = normQT t1 |=> normQT t2
+normQT (TProd ts)   = tProd (map normQT ts)
+normQT t            = t
 
 ---------------------------------------------------------
 -- Show
@@ -134,7 +144,7 @@ instance Show QType where
 myShowQT TB         = "\\BaseQ"
 myShowQT (TSup t)   = "\\TSup{" ++ show t ++ "}"
 myShowQT (TFun t u) = "\\TFun{" ++ show t ++ "}{" ++ show u ++ "}"
-myShowQT (TProd ts) | all isDuplicable ts = "\\BaseQN{" ++ show (length ts) ++ "}"
+myShowQT (TProd ts) | all (not . isLinear) ts = "\\BaseQN{" ++ show (length ts) ++ "}"
 myShowQT (TProd ts) = myShowListProd ts
 myShowQT _          = error "Extend the function in case you extend the type"
 
