@@ -49,7 +49,7 @@ ejLCWrong = lam "x" (tSup QT.tB) ejLCWrongBody
 envLC = runM (updateEnv ("x", tSup QT.tB) emptyEnv)
 
 ejLC2Fun = lam "x" (QT.tB) (var "x" <+> var "x")
-ejLC2 = app ejLC2Fun ejKPlus
+ejLC2 = app ejLC2Fun kPlus
 
 ejLCB2 = ejIdB <+> ejLCB
 ejLCSB2 = ejSBId <+> ejLCSB
@@ -75,17 +75,73 @@ ejForReduce1 = app (app (lam "x" tB (lam "y" tB (var "x"))) k0) k1
 
 ejForReduce2 = app (app (lam "x" tB (lam "y" (tB |=> tB) (var "x"))) ejForReduce1) ejId
 
-ejCNot = lam "x" tB (var "x" <**> var "x")
+ejPEPE = lam "x" tB (var "x" <**> var "x")
 
-ejKPlus = (1 / sq2) .> (ejZero <+> ejOne)
+ejMePEPEKPlus = proj 1 (up (app ejPEPE kPlus))
 
-ejMeCNotKPlus = proj 1 (up (app ejCNot ejKPlus))
+kPlus  = (1 / sq2) .> (k0 <+> k1)
+kMinus = (1 / sq2) .> (k0 <+> ((-1) .> k1))
 
---ejReduceOne = reduceOne (decorate ejIdInOne)
+--hadamard |0> = |+>
+--hadamard |1> = |->
+--hadamard = qIf kMinus kPlus
+hadamard = lam "x" tB (app (qIf kMinus kPlus) (var "x"))
 
---ejReduceMore = 
+ejHadamardK0 = app hadamard k0
+ejHadamardK1 = app hadamard k1
+
+qNot = lam "x" tB (app (qIf k0 k1) (var "x"))
+
+h1 =  lam "x" (tBn 2) ((app hadamard (qHead (var "x"))) <**> (qTail (var "x")))
+
+hadamardBoth = lam "x" (tBn 2) ((app hadamard (qHead (var "x"))) <**> (app hadamard (qTail (var "x"))))
+
+-- this cannot be done, since we have a first order calculus
+-- oracle = lam "f" (tB |=> tB) 
+--            (lam "x" (tBn 2) 
+--              ((qHead (var "x")) <**> 
+--               (app (qIf 
+--                      (app qNot (app (var "f") (qHead (var "x")))) 
+--                      (app (var "f") (qHead (var "x")))) 
+--                    (qTail (var "x")))))
+-- so we have to "cheat", and do this one down here, justifying it with
+-- the fact that an oracle is actually a matrix, and we can always build
+-- a matrix when we know what how f is defined
+oracle f = (lam "x" (tBn 2) 
+             ((qHead (var "x")) <**> 
+              (app (qIf 
+                     (app qNot (app f (qHead (var "x")))) 
+                     (app f (qHead (var "x")))) 
+                   (qTail (var "x")))))
+
+zeroXone      = (k0 <**> k1)
+hBothZeroXOne = app hadamardBoth zeroXone
+upH0x1        = up hBothZeroXOne
+
+-- as "oracle f" is a license we take, accepting a function as a parameter, just because Uf can be actually represented
+-- by a static matrix, we can also write deutsch f without the fear of breaking first order.
+deutsch f = proj 1 (up (app h1 (app (oracle f) upH0x1)))
+            
+---
+---
+cnot = lam "x" (tBn 2) ((qHead (var "x")) <**> (app (qIf (app qNot (qTail (var "x"))) (qTail (var "x"))) (qHead (var "x"))))
+
+-- CONTINUE HERE: h31 = lam "x" (tBn 3) 
+
+
+
+
+-- TODO:
+-- \x:S(B).x+x
+-- \x:S(B).2.x
+-- \x:B.xx
+-- \x:B=>B.xx
+-- \x.S(B=>B).xx
+
+
 
 main = do
 --   writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
-   writeFile "Example/body.tex" (showChQT (decorate ejForReduce1))
+   writeFile "Example/body.tex" (showChQT (decorate ejHadamardK1))
+--   writeFile "Example/body.tex" (showChQT (decorate (deutsch (lam "x" tB (var "x")))))
    return ()
