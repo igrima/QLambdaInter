@@ -75,15 +75,18 @@ showPart 0 _                      = ""
 showPart r p | r == 1             = dropWhile (\c->c==' ') p
 showPart r p | denominator r == 1 = show (numerator r) ++ p
 showPart r ""                     = showRatio r
-showPart r p                      = "(" ++ showRatio r ++ ")" ++ p
+showPart r p                      = showRatio r ++ p
+                                    --"(" ++ showRatio r ++ ")" ++ p
 
 showRationalPart 1 = showPart 1 "1"  -- when part is Rational, 1 should show as 1; otherwise, showPart uses only part
 showRationalPart r = showPart r ""   -- when part is Rational, numbers should show as themselves (and NOT x 1)
-showSq2Part      r = showPart r " sq2"
+showSq2Part      r = showPart r " \\ensuremath{\\sqrt 2}"
 showIPart        r = showPart r " i"
-showSq2IPart     r = showPart r " sq2 i"
+showSq2IPart     r = showPart r " \\ensuremath{\\sqrt 2\\, i}"
 
-showRatio r = showsPrecRatio 1 r ""
+showRatio r = 
+    "\\ensuremath{\\cfrac{" ++ show (numerator r) ++ "}{" ++ show (denominator r) ++ "}}"
+    -- showsPrecRatio 1 r ""
 
 showsPrecRatio p r  =  showParen (p > 7) $
                           showsPrec 8 (numerator r) .
