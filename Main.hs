@@ -85,16 +85,16 @@ kMinus = (1 / sq2) .> (k0 <+> ((-1) .> k1))
 --hadamard |0> = |+>
 --hadamard |1> = |->
 --hadamard = qIf kMinus kPlus
-hadamard = lam "xh" tB (app (qIf kMinus kPlus) (var "xh"))
+hadamard = lam "a" tB (app (qIf kMinus kPlus) (var "a"))
 
 ejHadamardK0 = app hadamard k0
 ejHadamardK1 = app hadamard k1
 
-qNot = lam "xn" tB (app (qIf k0 k1) (var "xn"))
+qNot = lam "b" tB (app (qIf k0 k1) (var "b"))
 
-h1 =  lam "xh1" (tBn 2) ((app hadamard (qHead (var "xh1"))) <**> (qTail (var "xh1")))
+h1 =  lam "c" (tBn 2) ((app hadamard (qHead (var "c"))) <**> (qTail (var "c")))
 
-hadamardBoth = lam "xhb" (tBn 2) ((app hadamard (qHead (var "xhb"))) <**> (app hadamard (qTail (var "xhb"))))
+hadamardBoth = lam "d" (tBn 2) ((app hadamard (qHead (var "d"))) <**> (app hadamard (qTail (var "d"))))
 
 -- this cannot be done, since we have a first order calculus
 -- oracle = lam "f" (tB |=> tB) 
@@ -107,12 +107,12 @@ hadamardBoth = lam "xhb" (tBn 2) ((app hadamard (qHead (var "xhb"))) <**> (app h
 -- so we have to "cheat", and do this one down here, justifying it with
 -- the fact that an oracle is actually a matrix, and we can always build
 -- a matrix when we know what how f is defined
-oracle f = (lam "xo" (tBn 2) 
-             ((qHead (var "xo")) <**> 
+oracle f = (lam "e" (tBn 2) 
+             ((qHead (var "e")) <**> 
               (app (qIf 
-                     (app qNot (app f (qHead (var "xo")))) 
-                     (app f (qHead (var "xo")))) 
-                   (qTail (var "xo")))))
+                     (app qNot (app f (qHead (var "e")))) 
+                     (app f (qHead (var "e")))) 
+                   (qTail (var "e")))))
 
 zeroXone      = (k0 <**> k1)
 hBothZeroXOne = app hadamardBoth zeroXone
@@ -124,7 +124,7 @@ deutsch f = proj 1 (up (app h1 (app (oracle f) upH0x1)))
             
 ---
 ---
-cnot = lam "xcn" (tBn 2) ((qHead (var "xcn")) <**> (app (qIf (app qNot (qTail (var "xcn"))) (qTail (var "xcn"))) (qHead (var "xcn"))))
+cnot = lam "j" (tBn 2) ((qHead (var "j")) <**> (app (qIf (app qNot (qTail (var "j"))) (qTail (var "j"))) (qHead (var "j"))))
 
 -- CONTINUE HERE: h31 = lam "x" (tBn 3) 
 
