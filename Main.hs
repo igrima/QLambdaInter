@@ -85,16 +85,16 @@ kMinus = (1 / sq2) .> (k0 <+> ((-1) .> k1))
 --hadamard |0> = |+>
 --hadamard |1> = |->
 --hadamard = qIf kMinus kPlus
-hadamard = lam "x" tB (app (qIf kMinus kPlus) (var "x"))
+hadamard = lam "xh" tB (app (qIf kMinus kPlus) (var "xh"))
 
 ejHadamardK0 = app hadamard k0
 ejHadamardK1 = app hadamard k1
 
-qNot = lam "x" tB (app (qIf k0 k1) (var "x"))
+qNot = lam "xn" tB (app (qIf k0 k1) (var "xn"))
 
-h1 =  lam "x" (tBn 2) ((app hadamard (qHead (var "x"))) <**> (qTail (var "x")))
+h1 =  lam "xh1" (tBn 2) ((app hadamard (qHead (var "xh1"))) <**> (qTail (var "xh1")))
 
-hadamardBoth = lam "x" (tBn 2) ((app hadamard (qHead (var "x"))) <**> (app hadamard (qTail (var "x"))))
+hadamardBoth = lam "xhb" (tBn 2) ((app hadamard (qHead (var "xhb"))) <**> (app hadamard (qTail (var "xhb"))))
 
 -- this cannot be done, since we have a first order calculus
 -- oracle = lam "f" (tB |=> tB) 
@@ -107,12 +107,12 @@ hadamardBoth = lam "x" (tBn 2) ((app hadamard (qHead (var "x"))) <**> (app hadam
 -- so we have to "cheat", and do this one down here, justifying it with
 -- the fact that an oracle is actually a matrix, and we can always build
 -- a matrix when we know what how f is defined
-oracle f = (lam "x" (tBn 2) 
-             ((qHead (var "x")) <**> 
+oracle f = (lam "xo" (tBn 2) 
+             ((qHead (var "xo")) <**> 
               (app (qIf 
-                     (app qNot (app f (qHead (var "x")))) 
-                     (app f (qHead (var "x")))) 
-                   (qTail (var "x")))))
+                     (app qNot (app f (qHead (var "xo")))) 
+                     (app f (qHead (var "xo")))) 
+                   (qTail (var "xo")))))
 
 zeroXone      = (k0 <**> k1)
 hBothZeroXOne = app hadamardBoth zeroXone
@@ -124,7 +124,7 @@ deutsch f = proj 1 (up (app h1 (app (oracle f) upH0x1)))
             
 ---
 ---
-cnot = lam "x" (tBn 2) ((qHead (var "x")) <**> (app (qIf (app qNot (qTail (var "x"))) (qTail (var "x"))) (qHead (var "x"))))
+cnot = lam "xcn" (tBn 2) ((qHead (var "xcn")) <**> (app (qIf (app qNot (qTail (var "xcn"))) (qTail (var "xcn"))) (qHead (var "xcn"))))
 
 -- CONTINUE HERE: h31 = lam "x" (tBn 3) 
 
@@ -141,7 +141,7 @@ cnot = lam "x" (tBn 2) ((qHead (var "x")) <**> (app (qIf (app qNot (qTail (var "
 
 
 main = do
---   writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
-   writeFile "Example/body.tex" (showChQT (decorate ejHadamardK1))
---   writeFile "Example/body.tex" (showChQT (decorate (deutsch (lam "x" tB (var "x")))))
-   return ()
+  -- writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
+  -- writeFile "Example/body.tex" (showChQT (decorate ejHadamardK1))
+  writeFile "Example/body.tex" (showChQT (decorate (deutsch (lam "x" tB (var "x")))))
+ --  return ()
