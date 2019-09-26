@@ -29,53 +29,99 @@
 -- -----------------------------------------------------------------------------------------------------------//
 module QTsReduction where
 
+import QComplex as QC
+import Multiset as MS
 import QTerms
-import QTypes
+import QTypes as QT
 import QTMonad
 import QTrace
+import QTsTypeInference
 
 reduce :: ChurchQTerm -> ChurchQTerm
 reduce t = let (t', _, _) = runQTM (do setTerm t
-                                       reduceCBV t)
+                                       reduce' t)
             in t'
 
 traceReduce :: ChurchQTerm -> String
 traceReduce t = let (_, mem, _) = runQTM (do setTerm t
-                                             reduceCBV t)
+                                             reduce' t)
                  in showTrace $ getReductionTrace mem
 
-reduceCBV :: ChurchQTerm -> QTMonad ChurchQTerm
+reduce' :: ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: the term is normalizable
-reduceCBV t | isNormalForm t = return t
-reduceCBV t                  = do t' <- reduceOneStepCBV t
-                                  logTerm t'
-                                  reduceCBV t'
+reduce' t | isNormalForm t = return t
+reduce' t                  = do t' <- reduceOneStep t
+                                logTerm t'
+                                reduce' t'
 
 reduceOne :: ChurchQTerm -> ChurchQTerm
-reduceOne t = let (t', _, _) = runQTM (reduceOneStepCBV t)
+reduceOne t = let (t', _, _) = runQTM (reduceOneStep t)
                in t'
 
-reduceOneStepCBV :: ChurchQTerm -> QTMonad ChurchQTerm
+reduceOneStep :: ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: the term is ground and well typed 
-reduceOneStepCBV (App t u tapp) | isLam t && isValue u = applyBeta t u
-reduceOneStepCBV (App t u tapp) | isLam t              = do u' <- reduceOneStepCBV u
-                                                            return (App t u' tapp)
-reduceOneStepCBV (App t u tapp)                        = do t' <- reduceOneStepCBV t
+reduceOneStep (App t@(Lam _ _ _ _) u tapp) 
+  | isBaseQBitN (getType u) =
+    if (isBase u)
+     then applyBeta t u                                                    --(Beta_b; call by base)
+     else reduceAppByContextualRule t u tapp                               --(Contextual rule: Lam)
+reduceOneStep (App t@(Lam _ _ _ _) u tapp) 
+  | isLinear (getType u)                               = applyBeta t u     --(Beta_n; call by name)
+reduceOneStep (App (QIf t f _)     (QBit KOne)   tapp) = return t          --(if_1)
+reduceOneStep (App (QIf t f _)     (QBit KZero)  tapp) = return f          --(if_0)
+reduceOneStep (App t@(QIf _ _ _)   u             tapp) = reduceAppByContextualRule t u tapp 
+                                                                           --(Contextual rule: QIf)
+reduceOneStep (App t               (LC maus tlc) tapp)
+  | QT.isFunFromQBitN (getType t) = 
+    return (LC (foreach (\(u,a)->(App t u (appType (getType t) (getType u)),a)) maus) tapp)
+                                                                           --(LinR_+ & LinR_alpha)
+reduceOneStep (App t               (Null tnull)  tapp)
+  | QT.isFunFromQBitN (getType t) && isBaseQBitN tnull = 
+    return (Null (tSup (unSupType (appType (getType t) tnull))))           --(LinR_0)
+reduceOneStep (App (LC mats tlc)   u             tapp) =
+  return (LC (foreach (\(a,t)->(a, App t u (appType (getType t) (getType u)))) mats) tapp)
+                                                                           --(LinL_+ & LinL_alpha)
+reduceOneStep (App (Null tnull)    u             tapp)
+  | QT.isFunFromQBitN tnull =
+    return (Null (tSup (unSupType (appType tnull (getType t)))))           --(LinL_0)
+reduceOneStep (LC mats tlc) = reduceLCRules mats tlc                       --(LC Rules)
+
+
+-- 
+reduceOneStep (App t u tapp)                           = do t' <- reduceOneStep t
                                                             return (App t' u tapp)
-reduceOneStepCBV v                                     = return v
+reduceOneStep v                                        = return v
+-- 
 
-reduceOneStepCBN :: ChurchQTerm -> QTMonad ChurchQTerm
--- PRECOND: the term is ground and well typed 
-reduceOneStepCBN (App t u tapp) | isLam t = applyBeta t u
-reduceOneStepCBN (App t u tapp)           = do t' <- reduceOneStepCBN t
-                                               return (App t' u tapp)
-reduceOneStepCBN v                        = return v
+reduceAppByContextualRule :: ChurchQTerm -> ChurchQTerm -> QType -> QTMonad ChurchQTerm
+reduceAppByContextualRule t u tapp = do u' <- reduceOneStep u
+                                        return (App t u' tapp)
 
+--reduceLCRules :: ChurchQTerm -> QTMonad ChurchQTerm --(Prod & Alpha_dist given by representation)
+reduceLCRules mats tlc = 
+  let rmats     = MS.fromMultiList (reduceLCByFactRule (MS.order mats))
+      mats'     = filterMS (\(t,a) -> isNull t || a == 0) rmats --(Zero_alpha)
+      (alpha,t) = MS.fromSingleton mats'
+   in if (MS.isSingleton mats' && alpha == 1)
+       then return t                    --(Unit & Neutral & Zero)
+       else if (MS.isEmpty mats')
+             then return (Null (QT.unSup tlc))     --(Neutral & Zero & Zero_S)
+             else return (LC mats' tlc) --(Neutral & Zero)
+-- NACHO: Report notes: The sole definition of .> is implementing Prod and Alpha_dist rules)
+--                      Same happens with <+> and Fact2)
+
+reduceLCByFactRule :: [((ChurchQTerm,QComplex), Int)] -> [((ChurchQTerm,QComplex), Int)]
+reduceLCByFactRule []    = []
+reduceLCByFactRule [tan] = [tan]
+reduceLCByFactRule (tan@((t,qc),i):tan'@((t',qc'),i'):tans) =
+  if (t == t')
+   then reduceLCByFactRule (((t,fromInt i * qc + fromInt i' * qc'),1):tans)
+   else tan : reduceLCByFactRule (tan':tans)
 
 -----------------------------------------------------------------------------
 -- Reduction rules
 -----------------------------------------------------------------------------
--- PRECOND: the term has the form ((\x:tC.t)u)
+-- PRECOND: the term has the form ((\x:tC.t)u) and the types are compatible.
 -- (beta) (\x:tC.t)u --> t[x:=u]
 applyBeta (Lam x _ t _) u = do logReduction "beta"
                                subst t x u
@@ -83,17 +129,43 @@ applyBeta (Lam x _ t _) u = do logReduction "beta"
 subst :: ChurchQTerm -> Vble -> ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: s and the variable z in the term has the same type
 subst v@(Var x _)         z u           = return (if (z == x) then u else v)
-subst t@(Lam x _ _ _)     z u | z == x  = return t
-subst t@(Lam x tx r tlam) z u           = do newr <- subst r z u
-                                             return (Lam x tx newr tlam)
-subst (App r s tapp)      z u           = do newr <- subst r z u
-                                             news <- subst s z u
-                                             return (App newr news tapp)
+subst t@(Lam x tx r tlam) z u | z /= x  = do r' <- subst r z u
+                                             return (Lam x tx r' tlam)
+subst (App r s tapp)      z u           = do r' <- subst r z u
+                                             s' <- subst s z u
+                                             return (App r' s' tapp)
+-- subst (LC mt tlc)         z u           = do mt' <- MS.foreachM (\(a,t) -> do t' <- subst t z u; return (a,t')) mt
+subst (LC mt tlc)         z u           = do mt' <- MS.foreachM (\(t,a) -> (\x -> (x,a)) <$> subst t z u) mt
+                                             return (LC mt' tlc)
+subst (Prod ts tprod)     z u           = do ts' <-  mapM (\t -> subst t z u) ts
+                                             return (Prod ts' tprod)
+subst (Head t thead)      z u           = do t' <- subst t z u
+                                             return (Head t' thead)
+subst (Tail t ttail)      z u           = do t' <- subst t z u
+                                             return (Tail t' ttail)
+subst (Proj n t tproj)    z u           = do t' <- subst t z u
+                                             return (Proj n t' tproj)
+subst (QIf t f tif)       z u           = do t' <- subst t z u
+                                             f' <- subst f z u
+                                             return (QIf t' f' tif)
+subst (Up t tup)          z u           = do t' <- subst t z u
+                                             return (Up t' tup)
 subst t                   _ _           = return t
 
 isNormalForm :: ChurchQTerm -> Bool
 -- PRECOND: the term is ground and well typed
-inNormalForm (Lam _ _ _ _) = True
-isNormalForm (Base _)      = True
-isNormalForm _             = False
+isNormalForm (QBit _)                = True
+isNormalForm (Null _)                = True
+isNormalForm (Var _ _)               = True
+isNormalForm (Lam _ _ _ _)           = True
+isNormalForm (App (Lam _ _ _ _) _ _) = False
+isNormalForm (App f _ _)             = isNormalForm f 
+isNormalForm (LC mt _)               = let tsi = MS.order mt
+                                           (_,alpha) = MS.fromSingleton mt
+                                        in not (MS.isSingleton mt && alpha == 1)
+                                           && all (\t-> isNormalForm t && not (isNull t))
+                                               (map (fst . fst) tsi)
+isNormalForm (Prod ts _)             = all isNormalForm ts
+isNormalForm (QIf _ _ _)             = True
+isNormalForm _                       = False
 

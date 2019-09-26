@@ -31,8 +31,8 @@
 -- This is a first order calculus: Functions does not accept functions as a parameter
 module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
                        , isLinear, isQBitType, isValidQType
-                       , isBaseQBitN, stripSups, buildFun, buildSup
-                       , buildSups, buildProd
+                       , isBaseQBitN, isFunFromQBitN, stripSups, unSup
+                       , buildFun, buildSup, buildSups, buildProd
              )
  where
 
@@ -69,6 +69,10 @@ isValidQType t            = isQBitType t
 
 isLinear :: QType -> Bool
 isLinear t = not (isBaseQBitN t)
+
+isFunFromQBitN :: QType -> Bool -- Verifies if it's (B^n => A) in the paper
+isFunFromQBitN (TFun t _) = isBaseQBitN t
+isFunFromQBitN _          = False
 
 ---------------------------------------------------------
 -- Functions for construction (DO NOT USE DATA CONSTRUCTORS)
@@ -126,6 +130,7 @@ tProd (t:ts) = t |*| tProd ts
 stripSups (TSup t) = (\(n,t)->(n+1, t)) (stripSups t)
 stripSups t        = (0, t)
 
+unSup t = snd (stripSups t)
 ---------------------------------------------------------
 -- QTypes Representation Normalization
 ---------------------------------------------------------

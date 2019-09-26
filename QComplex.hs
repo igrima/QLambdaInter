@@ -43,6 +43,9 @@ img = QC 0 0 1 0
 sq2 :: QComplex
 sq2 = QC 0 1 0 0
 
+fromInt :: Int -> QComplex
+fromInt i = fromInteger (toInteger i)
+
 instance Eq QComplex where
   QC r1 s1 i1 si1 == QC r2 s2 i2 si2 = r1  == r2 &&
                                        s1  == s2 &&
@@ -69,7 +72,6 @@ s1 .++. s2 = s1 ++ " + " ++ s2
 
 (.%.) :: Integer -> Integer -> QComplex
 n .%. m = fromRational (n % m)
-
 
 showPart 0 _                      = ""
 showPart r p | r == 1             = dropWhile (\c->c==' ') p

@@ -40,7 +40,7 @@ import Data.List as L
 type Vble = String
 data QBit = KZero | KOne
           deriving (Eq, Ord, Show)
-type LinBQT a = MS.Multiset (QComplex, BaseQT a)
+type LinBQT a = MS.Multiset (BaseQT a, QComplex)
 data BaseQT a = 
                 -- Constants
                 QBit QBit
@@ -77,7 +77,7 @@ type ChurchQTerm = BaseQT QT.QType
 
 asLinCom :: BaseQT a -> LinBQT a
 asLinCom (LC mt _) = mt
-asLinCom t         = singleton (1, t)
+asLinCom t         = singleton (t, 1)
 
 -- Get the type annotated in a Church term.
 getType :: ChurchQTerm -> QT.QType
@@ -99,12 +99,17 @@ isBase :: BaseQT a -> Bool -- Verifies if it's a value of b in the paper (catego
 isBase (QBit _)      = True
 isBase (Var _ _)     = True
 isBase (Lam _ _ _ _) = True
+isBase (QIf _ _ _)   = True
 isBase (Prod ts _)   = all isBase ts
 isBase _             = False
 
 isLam :: BaseQT a -> Bool
 isLam (Lam _ _ _ _) = True
 isLam _             = False
+
+isNull :: BaseQT a -> Bool
+isNull (Null _) = True
+isNull _        = False
 
 isGround :: Ord a => BaseQT a -> Bool
 isGround t = freeVars t == []
@@ -116,7 +121,7 @@ instance Ord a => HasFreeVars (BaseQT a) where
   freeVars (Var x _)     = [x]
   freeVars (Lam x _ t _) = freeVars t \\ [x]
   freeVars (App t u _)   = freeVars t `L.union` freeVars u
-  freeVars (LC mt _)     = foldMS (\((_,t),_) fvs -> freeVars t `L.union` fvs) [] mt
+  freeVars (LC mt _)     = foldMS (\((t,_),_) fvs -> freeVars t `L.union` fvs) [] mt
   freeVars (Prod ts _)   = foldr L.union [] (map freeVars ts)
   freeVars (Head t _)    = freeVars t
   freeVars (Tail t _)    = freeVars t
@@ -152,7 +157,7 @@ lam x t e = Lam x t e ()
 app r s   = App r s ()
 
 --a .> t     = LC (singleton (a,t)) ()
-a .> t     = LC (MS.foreach (\(b,t')->(a*b,t')) (asLinCom t)) ()
+a .> t     = LC (MS.foreach (\(t',b)->(t',a*b)) (asLinCom t)) ()
 t <+> u    = LC (MS.union (asLinCom t) (asLinCom u)) ()
 linCom tsi typ = LC (MS.fromMultiList tsi) typ
 
@@ -216,15 +221,15 @@ showFromList showElem separator []     = ""
 showFromList showElem separator [x]    = showElem x
 showFromList showElem separator (x:xs) = showElem x ++ separator ++ (showFromList showElem separator xs)
 
-showLinBQTItem ((qc,x), 1)   = showQCxQT (qc, x)
-showLinBQTItem ((qc,x), n)   = showQCxQT (qc, x) ++ " + " ++ showLinBQTItem ((qc,x), n-1)
-showChLinBQTItem ((qc,x), 1) = showChQCxQT (qc, x)
-showChLinBQTItem ((qc,x), n) = showChQCxQT (qc, x) ++ " + " ++ showChLinBQTItem ((qc,x), n-1)
+showLinBQTItem ((x,qc), 1)   = showQCxQT (x,qc)
+showLinBQTItem ((x,qc), n)   = showQCxQT (x,qc) ++ " + " ++ showLinBQTItem ((x,qc), n-1)
+showChLinBQTItem ((x,qc), 1) = showChQCxQT (x,qc)
+showChLinBQTItem ((x,qc), n) = showChQCxQT (x,qc) ++ " + " ++ showChLinBQTItem ((x,qc), n-1)
 
-showQCxQT      (1, x)      = showQT x
-showQCxQT      (qcomp, x)  = "\\paren{" ++ showNested qcomp ++ " " ++ showQT x ++ "}"
-showChQCxQT    (1, x)      = showChQT x
-showChQCxQT    (qcomp, x)  = "\\paren{" ++ showNested qcomp ++ " " ++ showChQT x ++ "}"
+showQCxQT      (x, 1)      = showQT x
+showQCxQT      (x, qcomp)  = "\\paren{" ++ showNested qcomp ++ " " ++ showQT x ++ "}"
+showChQCxQT    (x, 1)      = showChQT x
+showChQCxQT    (x, qcomp)  = "\\paren{" ++ showNested qcomp ++ " " ++ showChQT x ++ "}"
 --
     
 --instance Show a => Show (BaseQT a) where

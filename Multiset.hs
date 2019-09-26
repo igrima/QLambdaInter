@@ -30,7 +30,7 @@
 module Multiset(Multiset, empty, isEmpty, singleton, isSingleton, fromSingleton
                         , union, intersect, occurs, flatten
                         , equals, included, substract
-                        , order, foreach, mAll, foldMS
+                        , order, foreach, foreachM, mAll, foldMS
                         , fromList, fromMultiList, fullshow, showMSWith)
  where
 
@@ -62,8 +62,10 @@ included      :: Ord a => Multiset a -> Multiset a -> Bool
 substract     :: Ord a => Multiset a -> Multiset a -> Maybe (Multiset a)
 order         :: Ord a => Multiset a -> [(a,Int)]
 foreach       :: (Ord a, Ord b) => (a->b) -> Multiset a -> Multiset b
-mAll          :: (Ord a) => (a->Bool) -> Multiset a -> Bool
-foldMS        :: (Ord a) => ((a,Int)->b->b) -> b -> Multiset a -> b
+foreachM      :: (Ord a, Ord b, Monad m) => (a->m b) -> Multiset a -> m (Multiset b)
+mAll          :: Ord a => (a->Bool) -> Multiset a -> Bool
+filterMS      :: Ord a => (a->Bool) -> Multiset a -> Multiset a
+foldMS        :: Ord a => ((a,Int)->b->b) -> b -> Multiset a -> b
 fromList      :: Ord a => [a] -> Multiset a
 fromMultiList :: Ord a => [(a,Int)] -> Multiset a
 
@@ -85,7 +87,10 @@ included   (MS r1) (MS r2) = includedRep r1 r2
 substract  (MS r1) (MS r2) = fmap MS (substractRep r1 r2)
 order      (MS r)          = orderRep r
 foreach f  (MS xs)         = MS (foreachRep f xs)
+foreachM f (MS xs)         = do xs' <- foreachMRep f xs
+                                return (MS xs')
 mAll    f  (MS xs)         = mAllRep f xs
+filterMS p (MS xs)         = MS (filterMSRep p xs) 
 foldMS f z (MS xs)         = foldr f z xs
 fromList  xs               = foldr (\x m -> union (singleton x) m) (MS []) xs
 fromMultiList xns          = foldr (\(x,n) m -> union (multisingleton x n) m) (MS []) xns
@@ -95,6 +100,7 @@ fromMultiList xns          = foldr (\(x,n) m -> union (multisingleton x n) m) (M
 ---------------------------------------------------------
 singletonRep x = [(x,1)]
 
+multisingletonRep x 0 = []
 multisingletonRep x n = [(x,n)]
 
 isSingletonRep [(_,1)] = True
@@ -162,7 +168,14 @@ orderRep = id
 
 foreachRep f xs = normalizeRep (map (\(a,i) -> (f a,i)) xs)
 
+-- 1ro foreachMRep f xs = do xs' <- mapM (\(a,i) -> do a' <- f a; return (a',i)) xs
+-- 2do foreachMRep f xs = do xs' <- mapM (\(a,i) -> (,i) <$> f a) xs
+--                           return (normalizeRep xs')
+foreachMRep f xs = normalizeRep <$> (mapM (\(a,i) -> (\x -> (x,i)) <$> (f a)) xs)
+
 mAllRep f xs = all (\(a,i) -> f a) xs
+
+filterMSRep p xs = filter (\(a,i)->p a) xs 
 
 normalizeRep :: Ord a => [(a,Int)] -> [(a,Int)]
 -- It orders the output and elminate duplicates. Output satisfies Multisets representation invariant.

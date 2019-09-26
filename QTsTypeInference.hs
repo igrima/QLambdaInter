@@ -128,22 +128,22 @@ deduceType env (Up t _) =
 deduceType _ _ = raise "TODO"
 
 
-deduceTypesForLC env [((alpha,t),n)]     = 
+deduceTypesForLC env [((t,alpha),n)]     = 
    do checkLinearUse n env (freeVars t)
       (cht', tt') <- deduceType env t
       stt' <- produceCompatibleSupTypeFor tt' tt'  -- Adds a TSup if necessary
                 ("This cannot happen, something went oddly wrong") -- This cannot fail, but added for consistency
-      return ([((alpha,cht'),n)], stt')
-deduceTypesForLC env (((alpha,t),n):ts) = 
+      return ([((cht',alpha),n)], stt')
+deduceTypesForLC env (((t,alpha),n):ts) = 
    do checkLinearUse n env (freeVars t)
       envForTs <- trimEnvWrt env t
-      envForT  <- trimEnvWrts env (map (snd . fst) ts)
+      envForT  <- trimEnvWrts env (map (fst . fst) ts)
       checkOverlapIsNonLinear envForTs envForT
       (chts', stt') <- deduceTypesForLC envForTs ts
       (cht', tt')   <- deduceType envForT t 
       stt''         <- produceCompatibleSupTypeFor tt' stt'
                          ("Types are not compatible for Linear Combinations (" ++ show tt' ++ " --- " ++ show stt' ++ ")")
-      return ((((alpha,cht'),n):chts'), stt'')
+      return ((((cht',alpha),n):chts'), stt'')
 
 deduceTypesForProd env [t] = 
    do (cht, tt) <- deduceType env t
@@ -216,7 +216,7 @@ upTypeRep (t:ts) = do t'  <- unSupType t
                                            return (tts'++ts')
                         _            -> return (t':ts')
 
-unSupType tt = return (snd (QT.stripSups tt))
+unSupType tt = return (QT.unSup tt)
 
 -- PRECOND: argument is normalized
 unBnType tt = splitBnType 1 tt
