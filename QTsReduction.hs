@@ -73,17 +73,21 @@ reduceOneStep (App t@(QIf _ _ _)   u             tapp) = reduceAppByContextualRu
                                                                            --(Contextual rule: QIf)
 reduceOneStep (App t               (LC maus tlc) tapp)
   | QT.isFunFromQBitN (getType t) = 
-    return (LC (foreach (\(u,a)->(App t u (appType (getType t) (getType u)),a)) maus) tapp)
-                                                                           --(LinR_+ & LinR_alpha)
+    do maus' <- foreachM (\(u,a)-> do ttu <- appType (getType t) (getType u)
+                                      return (App t u ttu, a)) maus
+       return (LC maus' tapp)                                              --(LinR_+ & LinR_alpha)
 reduceOneStep (App t               (Null tnull)  tapp)
-  | QT.isFunFromQBitN (getType t) && isBaseQBitN tnull = 
-    return (Null (tSup (unSupType (appType (getType t) tnull))))           --(LinR_0)
+  | QT.isFunFromQBitN (getType t) && isBaseQBitN tnull =
+    do tnull' <- appType (getType t) tnull -- TODO:NACHO: is this really tnull or S(tnull)???
+       return (Null (tSup (QT.unSup tnull')))                              --(LinR_0)
 reduceOneStep (App (LC mats tlc)   u             tapp) =
-  return (LC (foreach (\(a,t)->(a, App t u (appType (getType t) (getType u)))) mats) tapp)
-                                                                           --(LinL_+ & LinL_alpha)
+  do mats' <- foreachM (\(t,a)-> do ttu <- appType (getType t) (getType u)
+                                    return (App t u ttu, a)) mats
+     return (LC mats' tapp)                                                --(LinL_+ & LinL_alpha)
 reduceOneStep (App (Null tnull)    u             tapp)
   | QT.isFunFromQBitN tnull =
-    return (Null (tSup (unSupType (appType tnull (getType t)))))           --(LinL_0)
+    do tnull' <- appType tnull (getType u)
+       return (Null (tSup (QT.unSup tnull')))                              --(LinL_0)
 reduceOneStep (LC mats tlc) = reduceLCRules mats tlc                       --(LC Rules)
 
 
@@ -100,10 +104,10 @@ reduceAppByContextualRule t u tapp = do u' <- reduceOneStep u
 --reduceLCRules :: ChurchQTerm -> QTMonad ChurchQTerm --(Prod & Alpha_dist given by representation)
 reduceLCRules mats tlc = 
   let rmats     = MS.fromMultiList (reduceLCByFactRule (MS.order mats))
-      mats'     = filterMS (\(t,a) -> isNull t || a == 0) rmats --(Zero_alpha)
-      (alpha,t) = MS.fromSingleton mats'
+      mats'     = MS.filterMS (\(t,a) -> isNull t || a == 0) rmats --(Zero_alpha)
+      (t,alpha) = MS.fromSingleton mats'
    in if (MS.isSingleton mats' && alpha == 1)
-       then return t                    --(Unit & Neutral & Zero)
+       then return t                               --(Unit & Neutral & Zero)
        else if (MS.isEmpty mats')
              then return (Null (QT.unSup tlc))     --(Neutral & Zero & Zero_S)
              else return (LC mats' tlc) --(Neutral & Zero)

@@ -30,7 +30,7 @@
 module Multiset(Multiset, empty, isEmpty, singleton, isSingleton, fromSingleton
                         , union, intersect, occurs, flatten
                         , equals, included, substract
-                        , order, foreach, foreachM, mAll, foldMS
+                        , order, foreach, foreachM, mAll, filterMS, foldMS
                         , fromList, fromMultiList, fullshow, showMSWith)
  where
 
