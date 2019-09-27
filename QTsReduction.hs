@@ -34,6 +34,7 @@ import Multiset as MS
 import QTerms
 import QTypes as QT
 import QTMonad
+import Error
 import QTrace
 import QTsTypeInference
 
@@ -56,7 +57,7 @@ reduce' t                  = do t' <- reduceOneStep t
 
 reduceOne :: ChurchQTerm -> ChurchQTerm
 reduceOne t = let (t', _, _) = runQTM (reduceOneStep t)
-               in t'
+               in decorate t'
 
 reduceOneStep :: ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: the term is ground and well typed 
@@ -89,13 +90,14 @@ reduceOneStep (App (Null tnull)    u             tapp)
   | QT.isFunFromQBitN tnull =
     do tnull' <- appType tnull (getType u)
        return (Null (tSup (QT.unSup tnull')))                              --(LinL_0)
+reduceOneStep (App t u tapp)                           = reduceAppByContextualRule t u tapp
 reduceOneStep (LC mats tlc) = reduceLCRules mats tlc                       --(LC Rules)
 reduceOneStep (Head (Prod [] _) _)  = raise ("Empty Prod: This cannot happen, something went oddly wrong") 
                                         -- This cannot fail, but added for consistency
 reduceOneStep (Head (Prod [_] _) _) = raise ("Singleton Prod: This cannot happen, something went oddly wrong")
                                         -- This cannot fail, but added for consistency
 reduceOneStep (Head (Prod (t:ts) tprod) thead)
-  | QT.isBase t = return t                                                 --(head)
+  | isBase t = return t                                                 --(head)
 reduceOneStep (Head t thead) = do t' <- reduceOneStep t
                                   return (Head t' thead)                   --(Contextual rule: head)
 reduceOneStep (Tail (Prod [] _) _)  = raise ("Empty Prod: This cannot happen, something went oddly wrong") 
@@ -103,18 +105,20 @@ reduceOneStep (Tail (Prod [] _) _)  = raise ("Empty Prod: This cannot happen, so
 reduceOneStep (Tail (Prod [_] _) _) = raise ("Singleton Prod: This cannot happen, something went oddly wrong")
                                         -- This cannot fail, but added for consistency
 reduceOneStep (Tail (Prod (t:ts) tprod) thead)
-  | QT.isBase t = case ts of
-                   [u] -> return u                                         --(tail)
-                   _   -> return (Prod ts (QT.tailTProd tprod))            --(tail)
+  | isBase t = case ts of
+                 [u] -> return u                                           --(tail)
+                 _   -> return (Prod ts (QT.tailTProd tprod))              --(tail)
 reduceOneStep (Tail t ttail) = do t' <- reduceOneStep t
                                   return (Tail t' ttail)                   --(Contextual rule: tail)
 
 reduceOneStep (Up (Prod ts tprod) tup) = reduceUpByProdRules ts tprod tup
+reduceOneStep (Up (LC mats tlc)   tup) = 
+  return (LC (foreach (\(u,a) -> (Up u undefined, a)) mats) undefined)     --(distPlus_up & distAlpha_up)
+reduceOneStep (Up  t              tup) = do t' <- reduceOneStep t
+                                            return (Up t' tup)             --(Contextual rule: up)
 
 
 -- 
-reduceOneStep (App t u tapp)                           = do t' <- reduceOneStep t
-                                                            return (App t' u tapp)
 reduceOneStep v                                        = return v
 -- 
 
@@ -124,17 +128,26 @@ reduceAppByContextualRule t u tapp = do u' <- reduceOneStep u
 
 --reduceLCRules :: ChurchQTerm -> QTMonad ChurchQTerm --(Prod & Alpha_dist given by representation)
 reduceLCRules mats tlc = 
-  let rmats     = MS.fromMultiList (reduceLCByFactRule (MS.order mats))
-      mats'     = MS.filterMS (\(t,a) -> isNull t || a == 0) rmats --(Zero_alpha)
-      (t,alpha) = MS.fromSingleton mats'
-   in if (MS.isSingleton mats' && alpha == 1)
-       then return t                               --(Unit & Neutral & Zero)
-       else if (MS.isEmpty mats')
-             then return (Null (QT.unSup tlc))     --(Neutral & Zero & Zero_S)
-             else return (LC mats' tlc) --(Neutral & Zero)
+  let mats'     = MS.filterMS (\(t,a) -> isNull t || a == 0) mats --(Zero & Zero_alpha)
+      rmats     = MS.fromMultiList (reduceLCByFactRule (MS.order mats'))
+      (t,alpha) = MS.fromSingleton rmats  -- due to Lazy Eval, this is not evaluated until you ask for alpha or t
+   in if (MS.isSingleton rmats && alpha == 1)
+       then return t                                              --(Unit & Neutral)
+       else if (MS.isEmpty rmats)
+             then return (Null (QT.unSup tlc))                    --(Neutral & Zero & Zero_S & Zero_alpha)
+             else if (rmats /= mats)
+                   then return (LC rmats tlc)                     --(Neutral & Zero)
+                   else do rmats' <- foreachM (\(t,a) -> 
+                                                 do t' <- if (isBase t) 
+                                                           then return t
+                                                           else reduceOneStep t
+                                                    return (t',a))
+                                              rmats
+                           return (LC rmats' tlc)                 --(Contextual Rule: LC)
 -- NACHO: Report notes: The sole definition of .> is implementing Prod and Alpha_dist rules)
 --                      Same happens with <+> and Fact2)
 
+-- this rule is used by (sq2 |0> + |0>) (not in the invariant of Multiset)
 reduceLCByFactRule :: [((ChurchQTerm,QComplex), Int)] -> [((ChurchQTerm,QComplex), Int)]
 reduceLCByFactRule []    = []
 reduceLCByFactRule [tan] = [tan]
@@ -143,20 +156,26 @@ reduceLCByFactRule (tan@((t,qc),i):tan'@((t',qc'),i'):tans) =
    then reduceLCByFactRule (((t,fromInt i * qc + fromInt i' * qc'),1):tans)
    else tan : reduceLCByFactRule (tan':tans)
 
-reduceUpByProdRules :: [((ChurchQTerm,QComplex),Int)] -> QType -> QType -> QTMonad ChurchQTerm
+reduceUpByProdRules :: [ChurchQTerm] -> QType -> QType -> QTMonad ChurchQTerm
 reduceUpByProdRules ts tprod _
   | all isBase ts           = return (Prod ts tprod)   --(NeutUp)
 reduceUpByProdRules ts tprod _ 
   | any (\x -> isNull x) ts = return (Null tprod)      --(DistNull)
-reduceUpByProdRules ts tprod tup = reduceUpByDistRules [] ts tprod tup
+reduceUpByProdRules ts tprod tup = reduceUpByDistRules [] ts tprod
 
+reduceUpByDistRules :: [ChurchQTerm] -> [ChurchQTerm] -> QType -> QTMonad ChurchQTerm
 reduceUpByDistRules bs []     tprod = return (Prod (reverse bs) tprod)
-reduceUpByDistRules bs (t:ts) tprod
+reduceUpByDistRules bs (t:ts) tprod =
   if (isBase t)
    then reduceUpByDistRules (t:bs) ts tprod
    else case t of
-          LC mats tlc -> LC (foreach (\(u,a)-> (Up (Prod (reverse bs ++ [u] ++ ts) ??) ??, a)) mats) ??
-
+          LC mats tlc -> return (LC 
+                                 (foreach
+                                  (\(u,a)-> (Up (Prod (reverse bs ++ [u] ++ ts) undefined) undefined, a))
+                                  mats) 
+                                 undefined)            --(distPlus & distAlpha)
+          _           -> raise "Cannot have something different than an LC on reduceUpByDistRules"
+                               -- This cannot fail, but added for completeness on case clause
 
 
 
@@ -201,6 +220,7 @@ isNormalForm (Null _)                = True
 isNormalForm (Var _ _)               = True
 isNormalForm (Lam _ _ _ _)           = True
 isNormalForm (App (Lam _ _ _ _) _ _) = False
+isNormalForm (App (QIf _ _ _) _ _)   = False
 isNormalForm (App f _ _)             = isNormalForm f 
 isNormalForm (LC mt _)               = let tsi = MS.order mt
                                            (_,alpha) = MS.fromSingleton mt

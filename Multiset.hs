@@ -38,7 +38,7 @@ module Multiset(Multiset, empty, isEmpty, singleton, isSingleton, fromSingleton
  -- This facilitates the combination operations, achieving O(max(n,m)) instead of O(n.m)
 newtype Multiset a = MS [(a,Int)]
    deriving (Eq, Ord)
-   {- REP.INV.: in MS ans
+   {- REP.INVARIANT.: in MS ans
         - ans is ordered by first component
         - there are no repetitions in first components
         - second components are >0

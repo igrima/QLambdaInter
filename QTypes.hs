@@ -29,7 +29,7 @@
 -- -----------------------------------------------------------------------------------------------------------//
 
 -- This is a first order calculus: Functions does not accept functions as a parameter
-module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd
+module QTypes(QType(..), tB, tBn, (|=>), tSup, (|*|), tProd, tailTProd
                        , isLinear, isQBitType, isValidQType
                        , isBaseQBitN, isFunFromQBitN, stripSups, unSup
                        , buildFun, buildSup, buildSups, buildProd
@@ -122,9 +122,9 @@ buildProd ret rai t          t'          = if (isQBitType t)
                                                   else rai ("Invalid type for TProd: " ++ show t')
                                             else rai ("Invalid type for TProd: " ++ show t)
 
-tailTProd :: QType -> QType -> QType
+tailTProd :: QType -> QType
 tailTProd = tailTP id error
-tailTP :: (QType -> b) -> (String -> b) -> QType -> QType -> b
+tailTP :: (QType -> b) -> (String -> b) -> QType -> b
 tailTP ret _   (TProd [_,t])  = ret t
 tailTP ret _   (TProd (_:ts)) = ret (tProd ts)
 tailTP _   rai t              = rai ("Invalid type for tailTProd" ++ show t)

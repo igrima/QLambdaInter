@@ -52,7 +52,7 @@ decorate r = getResValue (runQTM (decorateTerm emptyEnv r))
 decorateTerm env r = do (chr,_) <- deduceType env r
                         return chr
 
-deduceType :: Environment -> QTerm -> QTMonad (ChurchQTerm, QType) -- We add QType at the end
+deduceType :: Ord a => Environment -> BaseQT a -> QTMonad (ChurchQTerm, QType) -- We add QType at the end
 deduceType env (Null t)  =        -- rule Ax0                      -- for easy access in recursive
    do checkAllNonLinear env                                       -- calls. 
       st <- supType t
