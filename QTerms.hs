@@ -111,6 +111,10 @@ isNull :: BaseQT a -> Bool
 isNull (Null _) = True
 isNull _        = False
 
+isLC :: BaseQT a -> Bool
+isLC (LC _ _) = True
+isLC _        = False
+
 isGround :: Ord a => BaseQT a -> Bool
 isGround t = freeVars t == []
 

@@ -60,6 +60,7 @@ reduceOne t = let (t', _, _) = runQTM (reduceOneStep t)
 
 reduceOneStep :: ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: the term is ground and well typed 
+-- OBS: Rules assoc & comm are given for free by the representation of LC.
 reduceOneStep (App t@(Lam _ _ _ _) u tapp) 
   | isBaseQBitN (getType u) =
     if (isBase u)
@@ -89,6 +90,26 @@ reduceOneStep (App (Null tnull)    u             tapp)
     do tnull' <- appType tnull (getType u)
        return (Null (tSup (QT.unSup tnull')))                              --(LinL_0)
 reduceOneStep (LC mats tlc) = reduceLCRules mats tlc                       --(LC Rules)
+reduceOneStep (Head (Prod [] _) _)  = raise ("Empty Prod: This cannot happen, something went oddly wrong") 
+                                        -- This cannot fail, but added for consistency
+reduceOneStep (Head (Prod [_] _) _) = raise ("Singleton Prod: This cannot happen, something went oddly wrong")
+                                        -- This cannot fail, but added for consistency
+reduceOneStep (Head (Prod (t:ts) tprod) thead)
+  | QT.isBase t = return t                                                 --(head)
+reduceOneStep (Head t thead) = do t' <- reduceOneStep t
+                                  return (Head t' thead)                   --(Contextual rule: head)
+reduceOneStep (Tail (Prod [] _) _)  = raise ("Empty Prod: This cannot happen, something went oddly wrong") 
+                                        -- This cannot fail, but added for consistency
+reduceOneStep (Tail (Prod [_] _) _) = raise ("Singleton Prod: This cannot happen, something went oddly wrong")
+                                        -- This cannot fail, but added for consistency
+reduceOneStep (Tail (Prod (t:ts) tprod) thead)
+  | QT.isBase t = case ts of
+                   [u] -> return u                                         --(tail)
+                   _   -> return (Prod ts (QT.tailTProd tprod))            --(tail)
+reduceOneStep (Tail t ttail) = do t' <- reduceOneStep t
+                                  return (Tail t' ttail)                   --(Contextual rule: tail)
+
+reduceOneStep (Up (Prod ts tprod) tup) = reduceUpByProdRules ts tprod tup
 
 
 -- 
@@ -121,6 +142,23 @@ reduceLCByFactRule (tan@((t,qc),i):tan'@((t',qc'),i'):tans) =
   if (t == t')
    then reduceLCByFactRule (((t,fromInt i * qc + fromInt i' * qc'),1):tans)
    else tan : reduceLCByFactRule (tan':tans)
+
+reduceUpByProdRules :: [((ChurchQTerm,QComplex),Int)] -> QType -> QType -> QTMonad ChurchQTerm
+reduceUpByProdRules ts tprod _
+  | all isBase ts           = return (Prod ts tprod)   --(NeutUp)
+reduceUpByProdRules ts tprod _ 
+  | any (\x -> isNull x) ts = return (Null tprod)      --(DistNull)
+reduceUpByProdRules ts tprod tup = reduceUpByDistRules [] ts tprod tup
+
+reduceUpByDistRules bs []     tprod = return (Prod (reverse bs) tprod)
+reduceUpByDistRules bs (t:ts) tprod
+  if (isBase t)
+   then reduceUpByDistRules (t:bs) ts tprod
+   else case t of
+          LC mats tlc -> LC (foreach (\(u,a)-> (Up (Prod (reverse bs ++ [u] ++ ts) ??) ??, a)) mats) ??
+
+
+
 
 -----------------------------------------------------------------------------
 -- Reduction rules

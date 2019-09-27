@@ -122,6 +122,13 @@ buildProd ret rai t          t'          = if (isQBitType t)
                                                   else rai ("Invalid type for TProd: " ++ show t')
                                             else rai ("Invalid type for TProd: " ++ show t)
 
+tailTProd :: QType -> QType -> QType
+tailTProd = tailTP id error
+tailTP :: (QType -> b) -> (String -> b) -> QType -> QType -> b
+tailTP ret _   (TProd [_,t])  = ret t
+tailTP ret _   (TProd (_:ts)) = ret (tProd ts)
+tailTP _   rai t              = rai ("Invalid type for tailTProd" ++ show t)
+
 -- tProd ts = foldr1 (|*|) ts
 tProd :: [ QType ] -> QType
 tProd [t]    = t
