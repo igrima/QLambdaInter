@@ -116,11 +116,26 @@ reduceOneStep (Up (LC mats tlc)   tup) =
   return (LC (foreach (\(u,a) -> (Up u undefined, a)) mats) undefined)     --(distPlus_up & distAlpha_up)
 reduceOneStep (Up  t              tup) = do t' <- reduceOneStep t
                                             return (Up t' tup)             --(Contextual rule: up)
+reduceOneStep (Proj j t tproj) = 
+    if isNormalForm t 
+     then reduceProjByProjRule j t tproj                                   --(Proj)
+     else do t' <- reduceOneStep t  
+             return (Proj j t' tproj)                                      --(Contextual rule: up)
 
 
 -- 
 reduceOneStep v                                        = return v
+  -- OJO(FF): esta regla NO puede estar, porque se supone que reduceOneStep avanza un paso, sí o sí
 -- 
+
+-----------------------------------------------------------------------------
+-- Reduction rules
+-----------------------------------------------------------------------------
+-- PRECOND: the term has the form ((\x:tC.t)u) and the types are compatible.
+-- (beta) (\x:tC.t)u --> t[x:=u]
+applyBeta (Lam x _ t _) u = do logReduction "beta"
+                               subst t x u
+
 
 reduceAppByContextualRule :: ChurchQTerm -> ChurchQTerm -> QType -> QTMonad ChurchQTerm
 reduceAppByContextualRule t u tapp = do u' <- reduceOneStep u
@@ -149,12 +164,13 @@ reduceLCRules mats tlc =
 
 -- this rule is used by (sq2 |0> + |0>) (not in the invariant of Multiset)
 reduceLCByFactRule :: [((ChurchQTerm,QComplex), Int)] -> [((ChurchQTerm,QComplex), Int)]
-reduceLCByFactRule []    = []
-reduceLCByFactRule [tan] = [tan]
-reduceLCByFactRule (tan@((t,qc),i):tan'@((t',qc'),i'):tans) =
+reduceLCByFactRule []                                   = []
+reduceLCByFactRule [((t,qc),i)]                         = [((t,fromInt i * qc),1)]
+reduceLCByFactRule (((t,qc),i):tan'@((t',qc'),i'):tans) =
   if (t == t')
    then reduceLCByFactRule (((t,fromInt i * qc + fromInt i' * qc'),1):tans)
-   else tan : reduceLCByFactRule (tan':tans)
+   else ((t, fromInt i * qc), 1) : reduceLCByFactRule (tan':tans)
+        -- This ensures that multiplicities are always 1
 
 reduceUpByProdRules :: [ChurchQTerm] -> QType -> QType -> QTMonad ChurchQTerm
 reduceUpByProdRules ts tprod _
@@ -177,16 +193,23 @@ reduceUpByDistRules bs (t:ts) tprod =
           _           -> raise "Cannot have something different than an LC on reduceUpByDistRules"
                                -- This cannot fail, but added for completeness on case clause
 
+reduceProjByProjRule j (LC mats tlc)    tproj = projRule (MS.order mats) (unSup tlc) tproj
+reduceProjByProjRule j t@(Prod _ tprod) tproj = projRule [((t,1),1)]     tprod       tproj
+reduceProjByProjRule _ _                     _=
+     raise "CANNOT HAPPEN: types do not match..."
 
+-- TODO NACHO: verify (WITH A TEST) that all multiplicities are 1 
+--             (because nfs can only have a 1 -- other numbers were moved 
+--              to the scalar by reduceLCByFactRule)
+projRule taas tfs tproj = error "ToDo"
+  --do tjatns  <- projectIndividualComponents taas
+  --   tjatns' <- identifyEqualProjectedTerms tjatns
+  --   pts     <- buildAlternatives tjatns'
+  --   chooseOneWithGivenProbability pts
 
 -----------------------------------------------------------------------------
--- Reduction rules
+-- Auxiliaries
 -----------------------------------------------------------------------------
--- PRECOND: the term has the form ((\x:tC.t)u) and the types are compatible.
--- (beta) (\x:tC.t)u --> t[x:=u]
-applyBeta (Lam x _ t _) u = do logReduction "beta"
-                               subst t x u
-
 subst :: ChurchQTerm -> Vble -> ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: s and the variable z in the term has the same type
 subst v@(Var x _)         z u           = return (if (z == x) then u else v)
