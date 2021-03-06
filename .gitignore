@@ -27,3 +27,10 @@ tcbxparse.code.tex
 tcolorbox.sty
 tcolorbox.zip
 texput.log
+
+## emacs backup files
+*~
+\#*\#
+.\#*
+
+TAGS
