@@ -52,7 +52,8 @@ instance Monad Error where
    (Error e)      >>= _   = Error e
    (FatalError e) >>= _   = FatalError e
    return                 = Success
-   fail s                 = FatalError s
+   -- ghc does not expect fail
+   -- fail s                 = FatalError s
 
 --instance MonadPlus Error where
 mzero                     = Error ""

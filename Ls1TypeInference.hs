@@ -28,7 +28,7 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 -- -----------------------------------------------------------------------------------------------------------//
 
-module LambdaS1TypeInference where
+module Ls1TypeInference where
 
 import Data.List
 import Multiset as MS
@@ -39,13 +39,27 @@ import Error
 import QEnvironments
 import QTsTypeInference
 
+
+--valuesAreOrthogonal :: (BaseQT a) -> (BaseQT a) -> Bool
+
 ---------------------------------------------------------
 -- inferType
 ---------------------------------------------------------
-decorateLambdaS1 r = getResValue (runQTM (decorateLambdaS1Term emptyEnv r))
+decorateLs1 r = getResValue (runQTM (decorateTermLs1 emptyEnv r))
 
-decorateLambdaS1Term env r = do (chr,_) <- deduceLambdaS1Type env r
-                                return chr
-deduceLambdaS1Type :: Ord a => Environment -> BaseQT a -> QTMonad (ChurchQTerm, QType)
+decorateTermLs1 env r = do
+  (chr,_) <- deduceType env r
+  return chr
 
-deduceLambdaS1Type = deduceType
+deduceTypeLs1 :: Ord a => Environment -> BaseQT a -> QTMonad (ChurchQTerm, QType)
+
+deduceTypeLs1 env (Null t)  = raise ("There is no Null vector")
+deduceTypeLs1 env (QIf t r _) =
+   do (cht, tt) <- deduceTypeLs1 env t
+      (chr, tr) <- deduceTypeLs1 env r
+      ta        <- produceCompatibleTypeFor tt tr 
+                     ("Branch Types not compatible in QIf:\n" ++ show tt ++ "\n" ++ show tr)
+      tqif      <- qifType ta
+      return (QIf cht chr tqif, tqif)
+
+deduceTypeLs1 a b = deduceType a b
