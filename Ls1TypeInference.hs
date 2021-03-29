@@ -38,7 +38,9 @@ import QTMonad
 import Error
 import QEnvironments
 import QTsTypeInference
+import QComplex as QC
 
+coefsSquareSum ms = sum $ map (\x -> x * x) $ map (\((x, y), z) ->  y * QC.fromInt z) (MS.unMS ms)
 
 isValidTypeForQIf :: QType -> Bool
 isValidTypeForQIf (TSup _) = False -- TODO: not implemented yet
@@ -53,7 +55,7 @@ canComputeOrthogonality _             = False
 areOrthogonal :: Eq a => (BaseQT a) -> (BaseQT a) -> Bool
 areOrthogonal (QBit x) (QBit y) = x /= y
 areOrthogonal (Prod ts _) (Prod tt _) = ts /= tt
-areOrthogonal (LC v _) (LC w _) = True --TODO: implement this!
+areOrthogonal x@(LC v _) y@(LC w _) = True --TODO: implement this!
 areOrthogonal (LC mt _) _ = False
 areOrthogonal _ (LC mt _) = False
 areOrthogonal _ _ = False
@@ -84,5 +86,11 @@ deduceTypeLs1 env (QIf t r x) =
               tqif <- qifType ta
               return (QIf cht chr tqif, tqif)
             else raise ("Branch Types must be orthogonal")
+
+deduceTypeLs1 env s@(LC mt _) =
+  if not (1 == (coefsSquareSum mt))
+  then raise "Linear combination must be unit vector"
+  else
+    deduceType env s
 
 deduceTypeLs1 a b = deduceType a b
