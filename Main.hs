@@ -106,7 +106,7 @@ hadamardBoth = lam "d" (tBn 2) ((app hadamard (qHead (var "d"))) <**> (app hadam
 --                    (qTail (var "x")))))
 -- so we have to "cheat", and do this one down here, justifying it with
 -- the fact that an oracle is actually a matrix, and we can always build
--- a matrix when we know what how f is defined
+-- a matrix when we know how f is defined
 oracle f = (lam "e" (tBn 2) 
              ((qHead (var "e")) <**> 
               (app (qIf 
@@ -143,5 +143,8 @@ cnot = lam "j" (tBn 2) ((qHead (var "j")) <**> (app (qIf (app qNot (qTail (var "
 main = do
   -- writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
   -- writeFile "Example/body.tex" (showChQT (decorate ejHadamardK1))
+  -- THIS IS THE GOOD ONE: 
   writeFile "Example/body.tex" (showChQT (decorate (deutsch (lam "x" tB (var "x")))))
+  --writeFile "Example/body.tex" (showChQT (reduce (app (qIf k0 k1) ((3 .> k1) <+> (2 .> k0)) )))
+  --writeFile "Example/body.tex" (showChQT (decorate (app (qIf k0 k1) ((3 .> k1) <+> (2 .> k0)) )))
  --  return ()

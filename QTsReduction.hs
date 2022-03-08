@@ -37,6 +37,7 @@ import QTMonad
 import Error
 import QTrace
 import QTsTypeInference
+--import Data.Tuple.Extra
 
 reduce :: ChurchQTerm -> ChurchQTerm
 reduce t = let (t', _, _) = runQTM (do setTerm t
@@ -116,12 +117,8 @@ reduceOneStep (Up (LC mats tlc)   tup) =
   return (LC (foreach (\(u,a) -> (Up u undefined, a)) mats) undefined)     --(distPlus_up & distAlpha_up)
 reduceOneStep (Up  t              tup) = do t' <- reduceOneStep t
                                             return (Up t' tup)             --(Contextual rule: up)
-reduceOneStep (Proj j t tproj) = 
-    if isNormalForm t 
-     then reduceProjByProjRule j t tproj                                   --(Proj)
-     else do t' <- reduceOneStep t  
-             return (Proj j t' tproj)                                      --(Contextual rule: up)
 
+reduceOneStep (Proj i t tproj) = reduceByProjRules i t tproj
 
 -- 
 reduceOneStep v                                        = return v
@@ -193,20 +190,40 @@ reduceUpByDistRules bs (t:ts) tprod =
           _           -> raise "Cannot have something different than an LC on reduceUpByDistRules"
                                -- This cannot fail, but added for completeness on case clause
 
-reduceProjByProjRule j (LC mats tlc)    tproj = projRule (MS.order mats) (unSup tlc) tproj
-reduceProjByProjRule j t@(Prod _ tprod) tproj = projRule [((t,1),1)]     tprod       tproj
-reduceProjByProjRule _ _                     _=
-     raise "CANNOT HAPPEN: types do not match..."
+reduceByProjRules j (Null _)    tproj = raise "Cannot project Null vector"
+reduceByProjRules j (LC ms tlc) tproj | all (\((ti, ai),hi)-> isBaseQBitNTerm ti && hi == 1) (order ms)
+                                      = do tsi <- order ms
+                                           case tsi of
+                                             []           -> raise "This cannot happen, you can't have an LC with an empty set"
+                                             [((t,a), h)] -> raise "TODO:NACHO"
+                                             _            -> let ttsi1 = map (splitProdAt j) tsi
+                                                                 ttsi2 = sortBy compFst ttsi1
+                                                                 ttsi3 = groupBy eqFst ttsi2
+                                                                 ttsi4 = map (\tts->(fst3 (head tts)
+                                                                                    ,map (\(t1,t2,a)->(t2,a)) tts
+                                                                                    )
+                                                                              ) ttsi3 -- [(tj,[(tk,a)])]
+                                                                 alphas1 = map (map snd . snd) ttsi4 -- [[a]]
+                                                                 alphas2 = map (map ((\a->a^^2) . norm)) alphas1 -- [[|a|^^2]]
+                                                                 alphas3 = map (sqrt . sum) alphas2 -- [sqrt(sum(|a|^^2))]
+                                                                 projected = map ((\t->Prod t (tBn j)) . fst) ttsi4 --[(TProd tj TProd)]
+                                                              in raise "TODO:NACHO"
+                                           --ACA VA EL CALCULO GRANDOTE
+                                        
+reduceByProjRules j t           tproj | isBaseQBitNTerm t
+                                      = return t
+reduceByProjRules j t           tproj = do t' <- reduceOneStep t   
+                                           return (Proj j t' tproj)  --(Contextual Rule: Proj)
 
--- TODO NACHO: verify (WITH A TEST) that all multiplicities are 1 
---             (because nfs can only have a 1 -- other numbers were moved 
---              to the scalar by reduceLCByFactRule)
-projRule taas tfs tproj = error "ToDo"
-  --do tjatns  <- projectIndividualComponents taas
-  --   tjatns' <- identifyEqualProjectedTerms tjatns
-  --   pts     <- buildAlternatives tjatns'
-  --   chooseOneWithGivenProbability pts
+-- PRECOND: h MUST BE 1
+splitProdAt j ((Prod ts _, a), h) = let (ts1,ts2) = splitAt j ts
+                                     in (ts1,ts2,a)  -- h must be equal to 1 because of condition in reduceByProjRules
 
+compFst (ts1,_,_) (ts1',_,_) = compare ts1 ts1'
+eqFst   (ts1,_,_) (ts1',_,_) = ts1 == ts1'
+
+buildProjectedProdElement ((t1, tsa),coef) = let tsacoef = map (\(ts,a)->(ts,a/coef)) tsa
+                                              in raise "TODO:NACHO"
 -----------------------------------------------------------------------------
 -- Auxiliaries
 -----------------------------------------------------------------------------
@@ -236,6 +253,9 @@ subst (Up t tup)          z u           = do t' <- subst t z u
                                              return (Up t' tup)
 subst t                   _ _           = return t
 
+-- ghci cannot find Data.Tuple.Extra, so I'm implementing this here
+fst3 (a, _, _) = a
+
 isNormalForm :: ChurchQTerm -> Bool
 -- PRECOND: the term is ground and well typed
 isNormalForm (QBit _)                = True
@@ -250,6 +270,7 @@ isNormalForm (LC mt _)               = let tsi = MS.order mt
                                         in not (MS.isSingleton mt && alpha == 1)
                                            && all (\t-> isNormalForm t && not (isNull t))
                                                (map (fst . fst) tsi)
+                                           && all (\i-> i == 1) (map snd tsi)
 isNormalForm (Prod ts _)             = all isNormalForm ts
 isNormalForm (QIf _ _ _)             = True
 isNormalForm _                       = False

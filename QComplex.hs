@@ -107,7 +107,7 @@ instance Num QComplex where
                                          (r1 * i2  +     r2 * i1  + 2 * s1 * si2 + 2 * s2  * si1)
                                          (r1 * si2 +     r1 * si1 +     s1 * i2  +     s2  * i1)
 
-  abs qcomp = qcomp
+  abs qcomp = norm qcomp
 
   signum qcomp = 1
 
@@ -121,3 +121,11 @@ instance Fractional QComplex where
                                           ((si1 * r2 -     i1  * s2) / denom)
 
   _               / _            = error "This case should never occur, thus we are not making any calculations for it"
+
+
+norm (QC r s i si) = QC (r^^2 + 2 * (s^^2) + i^^2 + 2 * (si^^2)) (2 * (r * s + i * si)) 0 0
+-- Justification:
+-- a + b i = r + s sqrt2 + i img + si sqrt2 img => a = (r + s srt2) && b = (i + si sqrt2)
+-- Then, the norm of a QC is equal to (r + s srt2)^2 + (i + si sqrt2)^2
+-- (r + s srt2)^2 + (i + si sqrt2)^2 = r^2 + 2 r s sqrt2 + 2 s^2 + i^2 + 2 i si sqrt2 + 2 si^2 =
+-- = (r^2 + 2 s^2 + i^2 + 2 si^2) + 2 (r s + i si) sqrt2

@@ -103,6 +103,11 @@ isBase (QIf _ _ _)   = True
 isBase (Prod ts _)   = all isBase ts
 isBase _             = False
 
+isBaseQBitNTerm :: BaseQT a -> Bool -- Verifies if it's a product of QBits
+isBaseQBitNTerm (QBit _)    = True
+isBaseQBitNTerm (Prod ts _) = (length ts >= 2) && all isBaseQBitNTerm ts
+isBaseQBitNTerm _           = False
+
 isLam :: BaseQT a -> Bool
 isLam (Lam _ _ _ _) = True
 isLam _             = False
