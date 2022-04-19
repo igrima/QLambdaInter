@@ -120,6 +120,15 @@ instance Fractional QComplex where
                                           ((i1  * r2 - 2 * si1 * s2) / denom)
                                           ((si1 * r2 -     i1  * s2) / denom)
 
+  QC r1 s1 i1 si1 / QC r2 s2 i2 si2 = QC (r1 * r2 + 2 * s1 * s2 + i1 * i2 + 2 * si1 * si2)
+                                         (r1 * s2 + s1 * r2 + i1 * si2 + si1 * i2)
+                                         (i1 * r2 + 2 * si1 * s2 - r1 * i2 - 2 * s1 * si2)
+                                         (i1 * s2 + si1 * r2 - r1 * si2 - s1 * i2) /
+                                      QC (r2 * r2 + 2 * s2 * s2 + i2 * i2 + 2 * si2 * si2)
+                                         (2 * r2 * s2 + 2 * i2 * si2)
+                                         0
+                                         0
+
   _               / _            = error "This case should never occur, thus we are not making any calculations for it"
 
 
