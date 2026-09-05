@@ -36,7 +36,7 @@ import QTypes as QT
 import QTMonad
 import QEnvironments
 import QTsTypeInference
---import QTsReduction
+import QTsReduction
 --import QTrace
 
 runM m = getResValue (runQTM m)
