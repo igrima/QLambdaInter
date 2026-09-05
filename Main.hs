@@ -121,12 +121,17 @@ upH0x1        = up hBothZeroXOne
 -- as "oracle f" is a license we take, accepting a function as a parameter, just because Uf can be actually represented
 -- by a static matrix, we can also write deutsch f without the fear of breaking first order.
 deutsch f = proj 1 (up (app h1 (app (oracle f) upH0x1)))
-            
+
+deutschConst0 = deutsch (lam "x" tB k0)         -- constant, f(x)=0 for all x; expect ket 0
+deutschConst1 = deutsch (lam "x" tB k1)         -- constant, f(x)=1 for all x; expect ket 0
+deutschId     = deutsch (lam "x" tB (var "x"))  -- balanced, f=identity; expect ket 1
+deutschNot    = deutsch qNot                    -- balanced, f=not; expect ket 1
+
 ---
 ---
 cnot = lam "j" (tBn 2) ((qHead (var "j")) <**> (app (qIf (app qNot (qTail (var "j"))) (qTail (var "j"))) (qHead (var "j"))))
 
--- CONTINUE HERE: h31 = lam "x" (tBn 3) 
+-- CONTINUE HERE: h31 = lam "x" (tBn 3)
 
 
 
@@ -139,12 +144,50 @@ cnot = lam "j" (tBn 2) ((qHead (var "j")) <**> (app (qIf (app qNot (qTail (var "
 -- \x.S(B=>B).xx
 
 
+---------------------------------------------------------
+-- Worked examples from the paper (A concrete model for a typed linear algebraic lambda calculus), 
+-- kept here so they can be run and checked against the paper's own stated results.
+---------------------------------------------------------
+
+-- Vector space axioms example, arxiv.tex ~line 653:
+--   2.(1/2.|0>+|1>) - 2.|1>  -->*  |0>
+paperVSExample = ((2::QComplex) .> (((1/2) .> k0) <+> k1)) <+> (((-2)::QComplex) .> k1)
+
+-- Casting example ex:cast, arxiv.tex ~line 691:
+--   Up_r ((1/sqrt2).(|0>+|1>)) x |0>  -->*  (1/sqrt2).(|00>+|10>)
+-- (our Up is the n-ary generalization of the paper's binary Up_r/Up_l; on a 2-tuple
+-- it's the same rule)
+castExample = up (kPlus <**> k0)
+
+-- Projection example ex:pi, arxiv.tex ~line 773:
+--   pi_2(|000> + 2.|110> + 3.|001> + |111>)
+--     -->*  {2/3}(|00> x (|0>+3.|1>)/sqrt10)  ||  {1/3}(|11> x (2.|0>+|1>)/sqrt5)
+piExampleState = (k0<**>k0<**>k0) <+> ((2::QComplex) .> (k1<**>k1<**>k0)) <+> ((3::QComplex) .> (k0<**>k0<**>k1)) <+> (k1<**>k1<**>k1)
+piExample = proj 2 piExampleState
+
+-- Runs one example, printing its reduced (Church-decorated) form, and returns the
+-- same as a standalone LaTeX \[ \] block for Example/body.tex.
+runExample :: String -> QTerm -> IO String
+runExample label t =
+  do let result = showChQT (reduce (decorate t))
+     putStrLn (label ++ ":")
+     putStrLn result
+     putStrLn ""
+     -- NOTE: this used to be "% " ++ label, i.e. a LaTeX comment -- invisible in the
+     -- rendered PDF, only ever visible in the .tex source. \textbf here actually shows
+     -- the label above each example.
+     return ("\\medskip\\noindent\\textbf{" ++ label ++ "}\n\n\\[\n" ++ result ++ "\n\\]\n")
 
 main = do
-  -- writeFile "Example/body.tex" (traceReduce $ decorate ejForReduce2)
-  -- writeFile "Example/body.tex" (showChQT (decorate ejHadamardK1))
-  -- THIS IS THE GOOD ONE: 
-  writeFile "Example/body.tex" (showChQT (decorate (deutsch (lam "x" tB (var "x")))))
-  --writeFile "Example/body.tex" (showChQT (reduce (app (qIf k0 k1) ((3 .> k1) <+> (2 .> k0)) )))
-  --writeFile "Example/body.tex" (showChQT (decorate (app (qIf k0 k1) ((3 .> k1) <+> (2 .> k0)) )))
- --  return ()
+  texts <- mapM (uncurry runExample)
+             [ ("Vector space axioms (arxiv.tex, around line 653): expect ket 0", paperVSExample)
+             , ("Casting, ex:cast: expect (1/sqrt2).(|00>+|10>)", castExample)
+             , ("Hadamard: H|0>, expect ket +", ejHadamardK0)
+             , ("Hadamard: H|1>, expect ket -", ejHadamardK1)
+             , ("Projection, ex:pi: expect {2/3}(|00>x.../sqrt10) || {1/3}(|11>x.../sqrt5)", piExample)
+             , ("Deutsch, constant f(x)=0, expect ket 0", deutschConst0)
+             , ("Deutsch, constant f(x)=1, expect ket 0", deutschConst1)
+             , ("Deutsch, balanced f=identity, expect ket 1", deutschId)
+             , ("Deutsch, balanced f=not, expect ket 1", deutschNot)
+             ]
+  writeFile "Example/body.tex" (concat texts)
