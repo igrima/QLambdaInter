@@ -64,13 +64,27 @@ reduceOne t = let (t', _, _) = runQTM (reduceOneStep t)
 reduceOneStep :: ChurchQTerm -> QTMonad ChurchQTerm
 -- PRECOND: the term is ground and well typed 
 -- OBS: Rules assoc & comm are given for free by the representation of LC.
-reduceOneStep (App t@(Lam _ _ _ _) u tapp) 
+reduceOneStep (App t@(Lam _ _ _ _) u tapp)
   | isBaseQBitN (getType u) =
     if (isBase u)
      then applyBeta t u                                                    --(Beta_b; call by base)
      else reduceAppByContextualRule t u tapp                               --(Contextual rule: Lam)
-reduceOneStep (App t@(Lam _ _ _ _) u tapp) 
-  | isLinear (getType u)                               = applyBeta t u     --(Beta_n; call by name)
+-- The guard below used to be just `isLinear (getType u)`, checking only the ARGUMENT's
+-- type. But the paper (right after Figure TRSbeta) is explicit: beta_n only applies
+-- when the ABSTRACTION ITSELF expects a superposed argument; if it expects a basis
+-- type but is handed a superposed one (well-typed regardless, since application typing
+-- tolerates it), "the beta reduction cannot occur, and instead, the application must
+-- distribute first" (the LinL/LinR rules below). Without `isLinear tx` here, a
+-- function declared on B^n (e.g. a Deutsch oracle using head/tail on its parameter)
+-- would get the whole not-yet-reduced superposition substituted in directly, and
+-- head/tail would then be asked to act on a superposition, which they cannot do by
+-- design (see Figure TRSlists): the interpreter would get stuck looping forever
+-- instead of distributing the application over the superposition first. Adding
+-- `isLinear tx` makes this clause fail exactly in that case, falling through to the
+-- generic contextual rule (App t u tapp, at the bottom of this function), which
+-- reduces u until it becomes an LC or Null and one of LinR_+/LinR_0 below can fire.
+reduceOneStep (App t@(Lam _ tx _ _) u tapp)
+  | isLinear tx                                        = applyBeta t u     --(Beta_n; call by name)
 reduceOneStep (App (QIf t f _)     (QBit KOne)   tapp) = return t          --(if_1)
 reduceOneStep (App (QIf t f _)     (QBit KZero)  tapp) = return f          --(if_0)
 reduceOneStep (App t@(QIf _ _ _)   u             tapp) = reduceAppByContextualRule t u tapp 
@@ -168,7 +182,7 @@ reduceAppByContextualRule t u tapp = do u' <- reduceOneStep u
 --reduceLCRules :: ChurchQTerm -> QTMonad ChurchQTerm --(Prod & Alpha_dist given by representation)
 reduceLCRules mats tlc = 
   -- NOTE: this predicate was inverted (`isNull t || a == 0`), which KEEPS only the
-  -- null/zero-coefficient summands and drops everything else -- so any LC that wasn't
+  -- null/zero-coefficient summands and drops everything else, so any LC that wasn't
   -- already fully built in normal form (e.g. one assembled by a reduction rule, like
   -- Up's distPlus_up) would collapse straight to Null the moment it needed a further
   -- reduction step. (Zero & Zero_alpha) is supposed to drop the null/zero summands,
@@ -182,15 +196,34 @@ reduceLCRules mats tlc =
              then return (Null (QT.unSup tlc))                    --(Neutral & Zero & Zero_S & Zero_alpha)
              else if (rmats /= mats)
                    then return (LC rmats tlc)                     --(Neutral & Zero)
-                   else do rmats' <- foreachM (\(t,a) -> 
-                                                 do t' <- if (isBase t) 
+                   else do rmats' <- foreachM (\(t,a) ->
+                                                 do t' <- if (isBase t)
                                                            then return t
                                                            else reduceOneStep t
                                                     return (t',a))
                                               rmats
-                           return (LC rmats' tlc)                 --(Contextual Rule: LC)
+                           return (LC (flattenLC (MS.order rmats')) tlc) --(Contextual Rule: LC)
 -- NACHO: Report notes: The sole definition of .> is implementing Prod and Alpha_dist rules)
 --                      Same happens with <+> and Fact2)
+--
+-- The line above didn't used to call flattenLC: it just rewrapped (t',a) as-is, even
+-- when the reduceOneStep on this very line turned t into an LC itself (this happens,
+-- e.g., two distribution steps into Up's distPlus_up). .>/<+> are "the sole
+-- definition" implementing this flattening (per NACHO's note above) precisely because
+-- everywhere else, terms are built BY HAND through them (see the "Functions for easy
+-- construction" section of QTerms.hs -- that's the convention: never build a term with
+-- the LC/Prod/etc. constructors directly). But nothing hand-builds a term right here:
+-- reduceOneStep is the interpreter itself producing this shape mid-reduction, so if
+-- its result happens to be an LC, it has to get the same flattening .> would have
+-- given it, or it's left as an opaque LC-of-LCs that looks normal (isNormalForm has no
+-- way to tell) but breaks anything downstream expecting a flat sum of base terms --
+-- concretely, this is what made `deutsch` (Main.hs) stack-overflow: reduceByProjRules
+-- requires every summand to be isBaseQBitNTerm, an inner LC never is, so reduce' kept
+-- calling reduceOneStep on an already-settled, still-not-flat term forever.
+flattenLC :: [((ChurchQTerm,QComplex),Int)] -> LinBQT QType
+flattenLC = foldr (\((t,a),h) -> MS.union (scaleIntoLC (fromInt h * a) t)) MS.empty
+  where scaleIntoLC a (LC mt _) = MS.foreach (\(t',b) -> (t', a*b)) mt -- exactly asLinCom + the multiply in .>
+        scaleIntoLC a t         = MS.singleton (t,a)
 
 -- this rule is used by (sq2 |0> + |0>) (not in the invariant of Multiset)
 reduceLCByFactRule :: [((ChurchQTerm,QComplex), Int)] -> [((ChurchQTerm,QComplex), Int)]
@@ -256,7 +289,20 @@ reduceUpByDistRules bs (t:ts) tprod tup =
 -- ChurchQTerm otherwise standing for a single term, not a distribution.
 reduceByProjRules :: Int -> ChurchQTerm -> QType -> QTMonad ChurchQTerm
 reduceByProjRules j (Null _)    tproj = raise "Cannot project Null vector"
-reduceByProjRules j (LC ms tlc) tproj | all (\((ti, _),hi)-> isBaseQBitNTerm ti && hi == 1) (order ms)
+reduceByProjRules j (LC ms tlc) tproj
+  | let tsi = order ms
+  , all (\((ti, _),hi)-> isBaseQBitNTerm ti && hi == 1) tsi
+  -- Also require the LC to be FULLY factored (interference already resolved): if two
+  -- entries still refer to the same basis ket with separate, not-yet-combined
+  -- coefficients alpha/beta, summing their individually-squared norms (|alpha|^2 +
+  -- |beta|^2, what the code below does per bucket) is NOT the same number as the norm
+  -- of their combined amplitude (|alpha+beta|^2). Interference can only be computed
+  -- correctly once (rfact) has actually merged them. Without this check, (proj) could
+  -- fire on a not-yet-cancelled LC and report a probability that ignores interference
+  -- entirely (this is exactly what produced a bogus 1/3-2/3 split on Deutsch's
+  -- algorithm's balanced case, instead of the correct, certain ket 1).
+  , not (hasRepeatedTerm (map (fst . fst) tsi))
+  , all (\((_,a),_) -> a /= 0) tsi
                                       = case order ms of
                                           [] -> raise "This cannot happen, you can't have an LC with an empty set"
                                           tsi ->
@@ -360,15 +406,34 @@ isNormalForm (Lam _ _ _ _)           = True
 isNormalForm (App (Lam _ _ _ _) _ _) = False
 isNormalForm (App (QIf _ _ _) _ _)   = False
 isNormalForm (App f _ _)             = isNormalForm f 
-isNormalForm (LC mt _)               = let tsi = MS.order mt
+isNormalForm (LC mt _)               = let tsi       = MS.order mt
                                            (_,alpha) = MS.fromSingleton mt
+                                           terms     = map (fst . fst) tsi
                                         in not (MS.isSingleton mt && alpha == 1)
-                                           && all (\t-> isNormalForm t && not (isNull t))
-                                               (map (fst . fst) tsi)
+                                           && all (\t-> isNormalForm t && not (isNull t)) terms
                                            && all (\i-> i == 1) (map snd tsi)
+                                           && not (hasRepeatedTerm terms)
+                                           -- (rfact) can merge two nonzero summands of the same term
+                                           -- into a zero-coefficient one (interference / cancellation);
+                                           -- (Zero & Zero_alpha) then has to drop it, so a leftover
+                                           -- zero-coefficient entry isn't normal form either, exactly
+                                           -- like a Null term isn't (checked just above).
+                                           && all (\((_,a),_) -> a /= 0) tsi
 isNormalForm (Prod ts _)             = all isNormalForm ts
 isNormalForm (QIf _ _ _)             = True
 isNormalForm (Scale _ t _)           = isNormalForm t
 isNormalForm (Distr bs _)            = all (isNormalForm . snd) bs
 isNormalForm _                       = False
+
+-- True if two entries of an LC share the same underlying term (ignoring coefficient),
+-- meaning (rfact): alpha.t + beta.t -> (alpha+beta).t still applies. The Multiset's own
+-- key is the WHOLE (term,coefficient) pair (see LinBQT in QTerms.hs), so two entries
+-- for the same term with different coefficients are not caught by its no-duplicate-key
+-- invariant, and isNormalForm has to check this separately, or an LC that hasn't been
+-- through reduceLCByFactRule yet (e.g. straight out of reduceByProjRules's Scale,
+-- before interference has had a chance to cancel matching terms) gets waved through as
+-- already normal, when it's really still waiting on (rfact) -- and possibly (Zero) too,
+-- if the coefficients happen to cancel to 0.
+hasRepeatedTerm :: [ChurchQTerm] -> Bool
+hasRepeatedTerm ts = any (\g -> length g > 1) (groupBy (==) (sortBy compare ts))
 
