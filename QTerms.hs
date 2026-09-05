@@ -235,8 +235,9 @@ showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
 showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
 showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
 showQT (Up x _)       = "\\Cast{}{" ++ showQT x ++ "}{}"
-showQT (Scale n x _)  = "\\InvSqrt{" ++ show n ++ "}{" ++ showQT x ++ "}"
-showQT (Distr bs _)   = "\\ProbDist{" ++ showDistrBranches showQT bs ++ "}"
+showQT (Scale 1 x _)  = showQT x -- dividing by sqrt(1) is a no-op; don't clutter the display with it
+showQT (Scale n x _)  = "\\InvSqrt{" ++ show n ++ "}{" ++ showQT x ++ "}{}"
+showQT (Distr bs _)   = "\\ProbDist{" ++ showDistrBranches showQT bs ++ "}{}"
 
 showChQT :: ChurchQTerm -> String
 showChQT (QBit k)          = showBase k
@@ -252,8 +253,9 @@ showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}
 showChQT (Proj j x tproj)  = "\\Proj{" ++ show j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
 showChQT (QIf x y tqif)    = "\\Ite{" ++ showChQT x ++ "}{" ++ showChQT y ++ "}{" ++ show tqif ++ "}"
 showChQT (Up x tup)        = "\\Cast{}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
-showChQT (Scale n x _)     = "\\InvSqrt{" ++ show n ++ "}{" ++ showChQT x ++ "}"
-showChQT (Distr bs _)      = "\\ProbDist{" ++ showDistrBranches showChQT bs ++ "}"
+showChQT (Scale 1 x _)     = showChQT x -- dividing by sqrt(1) is a no-op; don't clutter the display with it
+showChQT (Scale n x t)     = "\\InvSqrt{" ++ show n ++ "}{" ++ showChQT x ++ "}{" ++ show t ++ "}"
+showChQT (Distr bs t)      = "\\ProbDist{" ++ showDistrBranches showChQT bs ++ "}{" ++ show t ++ "}"
 
 -- shared by showQT and showChQT: renders {p_1}.t_1 || ... || {p_n}.t_n
 showDistrBranches showElem = showFromList (\(p,t) -> "\\Proba{" ++ show p ++ "}{" ++ showElem t ++ "}") " \\parallel "

@@ -228,6 +228,12 @@
 \newcommand{\Proj}[3]{\ensuremath{\termApp{\pi_#1\ #2}{#3}}}
 \newcommand{\Ite}[3]{\ensuremath{\termApp{?{#1}\mathord{\cdot}{#2}}{#3}}}
 \newcommand{\Cast}[3]{\ensuremath{\termApp{\Uparrow_{#1}\ #2}{#3}}}
+% Scale n x t: x / sqrt(n), kept as an irreducible radical (see the comment on the
+% Scale constructor in QTerms.hs); Distr/Proba: the {p_1}t_1 || ... || {p_n}t_n
+% distribution built by a projective measurement (rule (proj))
+\newcommand{\InvSqrt}[3]{\ensuremath{\termApp{\frac{#2}{\sqrt{#1}}}{#3}}}
+\newcommand{\Proba}[2]{\ensuremath{\{#1\}\,#2}}
+\newcommand{\ProbDist}[2]{\ensuremath{\termApp{#1}{#2}}}
 
 \newcommand{\reduction}[1]{\ensuremath{\rightarrow_{#1}}}
 
