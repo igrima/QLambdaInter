@@ -61,6 +61,37 @@ data BaseQT a =
               | QIf (BaseQT a) (BaseQT a) a
                 -- Casting
               | Up (BaseQT a) a
+                -- Measurement outcomes: NOT part of the paper's term grammar (Lambda).
+                -- They are our stand-in for D, the set of probability distributions on
+                -- terms (Lambda \subsetneq D in the paper). We fold D into the same
+                -- Haskell type as Lambda purely so `reduceOneStep :: ChurchQTerm ->
+                -- QTMonad ChurchQTerm` has somewhere to put the result of (proj); the
+                -- paper keeps them as separate syntactic classes.
+                --   Scale radicand t   ::  t / sqrt(radicand)   (radicand : QComplex)
+                --     The exact renormalizing factor 1/sqrt(sum |alpha_i|^2) demanded by
+                --     Norm (the projection rule) generally does NOT live in QComplex's
+                --     field QQ[sqrt 2, i] (e.g. the paper's own worked example needs
+                --     1/sqrt(10)) -- QQ[sqrt 2, i] was only ever justified (Giles-Selinger)
+                --     as enough to APPROXIMATE arbitrary gates, not as closed under this
+                --     renormalization. Rather than force it into that field (losing
+                --     exactness) or generalize QComplex into a full symbolic-radical ring
+                --     (real work, for no payoff here), we just keep the radicand
+                --     unevaluated and print it as-is (sqrt N left irreducible).
+                --   Distr [(prob,outcome)] :: the parallel-probabilistic sum ||_k {p_k} t_k
+                --     from rule (proj); p_k are ordinary QComplex values (no sqrt needed,
+                --     it's a ratio of two sums of |.|^2) and are always in [0,1] summing to 1.
+                --
+                -- IMPORTANT (why this is fine, and not just swept under the rug): we only
+                -- ever build these as the OUTPUT of (proj), and we rely on the "principle
+                -- of deferred measurement" (Nielsen & Chuang) -- any circuit can be
+                -- rewritten so every measurement happens last -- to assume Proj only ever
+                -- occurs as the outermost node of a whole program (see the PRECOND on
+                -- reduceByProjRules). So a Scale/Distr value is always a TERMINAL result:
+                -- it only ever needs to be reduced internally (to display it) and shown,
+                -- never fed back into App/Head/Tail/another Proj/etc. If that assumption
+                -- is ever dropped, this representation needs to be revisited.
+              | Scale QComplex (BaseQT a) a
+              | Distr [(QComplex, BaseQT a)] a
         deriving (Eq, Ord, Show)
    {-
       Type parameter a is a technique for processing church style typing.
@@ -93,6 +124,8 @@ getType (Tail _ t)    = t
 getType (Proj _ _ t)  = t
 getType (QIf _ _ t)   = t
 getType (Up _ t)      = t
+getType (Scale _ _ t) = t
+getType (Distr _ t)   = t
 
 -- PRECOND: the term is ground and well typed 
 isBase :: BaseQT a -> Bool -- Verifies if it's a value of b in the paper (categorical semantics); Basis terms (B)
@@ -137,6 +170,8 @@ instance Ord a => HasFreeVars (BaseQT a) where
   freeVars (Proj _ t _)  = freeVars t
   freeVars (QIf t u _)   = freeVars t `L.union` freeVars u
   freeVars (Up t _)      = freeVars t
+  freeVars (Scale _ t _) = freeVars t
+  freeVars (Distr bs _)  = foldr (L.union . freeVars . snd) [] bs
   freeVars _             = []
 
 instance HasFreeVars t => HasFreeVars [t] where
@@ -200,6 +235,8 @@ showQT (Tail x _)     = "\\Tail{" ++ showQT x ++ "}{}"
 showQT (Proj j x _)   = "\\Proj{" ++ show j ++ "}{" ++ showQT x ++ "}{}"
 showQT (QIf x y _)    = "\\Ite{" ++ showQT x ++ "}{" ++ showQT y ++ "}{}"
 showQT (Up x _)       = "\\Cast{}{" ++ showQT x ++ "}{}"
+showQT (Scale n x _)  = "\\InvSqrt{" ++ show n ++ "}{" ++ showQT x ++ "}"
+showQT (Distr bs _)   = "\\ProbDist{" ++ showDistrBranches showQT bs ++ "}"
 
 showChQT :: ChurchQTerm -> String
 showChQT (QBit k)          = showBase k
@@ -215,6 +252,11 @@ showChQT (Tail x ttail)    = "\\Tail{" ++ showChQT x ++ "}{" ++ show ttail ++ "}
 showChQT (Proj j x tproj)  = "\\Proj{" ++ show j ++ "}{" ++ showChQT x ++ "}{" ++ show tproj ++ "}"
 showChQT (QIf x y tqif)    = "\\Ite{" ++ showChQT x ++ "}{" ++ showChQT y ++ "}{" ++ show tqif ++ "}"
 showChQT (Up x tup)        = "\\Cast{}{" ++ showChQT x ++ "}{" ++ show tup ++ "}"
+showChQT (Scale n x _)     = "\\InvSqrt{" ++ show n ++ "}{" ++ showChQT x ++ "}"
+showChQT (Distr bs _)      = "\\ProbDist{" ++ showDistrBranches showChQT bs ++ "}"
+
+-- shared by showQT and showChQT: renders {p_1}.t_1 || ... || {p_n}.t_n
+showDistrBranches showElem = showFromList (\(p,t) -> "\\Proba{" ++ show p ++ "}{" ++ showElem t ++ "}") " \\parallel "
 
 -- aux
 -- showLCSum                              = showFromList showLinBQTItem " + "
