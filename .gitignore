@@ -1,4 +1,9 @@
+*.hi
+*.o
+.DS_Store
+Main
 blueshade.png
+body.log
 body.tex
 crinklepaper.png
 environ.sty
